@@ -230,13 +230,29 @@ AP_RangeFinder_VL53L0X::AP_RangeFinder_VL53L0X(RangeFinder::RangeFinder_State &_
 */
 AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_State &_state, AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev)
 {
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "detect1");
+
+    {
+    	char buf[15];
+    	sprintf(buf, "addresses: %d %d", (int)_state.address, (int)dev->get_bus_address());
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    }
+    {
+        char buf[15];
+        sprintf(buf, "dev: %d", (!dev ? 0 : 1));
+        gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    }
 
 	if(!dev){
 		return nullptr;
 	}
     AP_RangeFinder_VL53L0X *sensor
         = new AP_RangeFinder_VL53L0X(_state, std::move(dev));
+
+    {
+        char buf[15];
+        sprintf(buf, "sensor: %d", (!sensor ? 0 : 1));
+        gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    }
 
     if (!sensor) {
         delete sensor;
@@ -245,6 +261,17 @@ AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_
 
     sensor->dev->get_semaphore()->take_blocking();
     
+    {
+        char buf[15];
+        sprintf(buf, "check_id: %d", (!sensor->check_id() ? 0 : 1));
+        gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    }
+    {
+        char buf[15];
+        sprintf(buf, "sensor->init: %d", (!sensor->init() ? 0 : 1));
+        gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    }
+
     if (!sensor->check_id() || !sensor->init()) {
         sensor->dev->get_semaphore()->give();
         delete sensor;
@@ -253,7 +280,7 @@ AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_
 
     sensor->dev->get_semaphore()->give();
     
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "detect2");
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "detected");
 
     return sensor;
 }
@@ -293,7 +320,7 @@ bool AP_RangeFinder_VL53L0X::get_SPAD_info(uint8_t * count, bool *type_is_apertu
     write_register(0x94, 0x6b);
     write_register(0x83, 0x00);
 
-    uint8_t tries = 50;
+    uint16_t tries = 5000;
     while (read_register(0x83) == 0x00) {
         tries--;
         if (tries == 0) {
@@ -590,6 +617,7 @@ bool AP_RangeFinder_VL53L0X::init()
     bool spad_type_is_aperture;
     if (!get_SPAD_info(&spad_count, &spad_type_is_aperture)) {
         printf("VL53L0X: Failed to get SPAD info\n");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to get SPAD info");
         return false;
     }
 
@@ -599,6 +627,7 @@ bool AP_RangeFinder_VL53L0X::init()
     uint8_t ref_spad_map[6];
     if (!dev->read_registers(GLOBAL_CONFIG_SPAD_ENABLES_REF_0, ref_spad_map, 6)) {
         printf("VL53L0X: Failed to read SPAD map\n");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed to read SPAD map");
         return false;
     }
 
@@ -659,6 +688,7 @@ bool AP_RangeFinder_VL53L0X::init()
     write_register(SYSTEM_SEQUENCE_CONFIG, 0x01);
     if (!performSingleRefCalibration(0x40)) {
         printf("VL53L0X: Failed SingleRefCalibration1\n");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed SingleRefCalibration1");
         return false;
     }
 
@@ -669,6 +699,7 @@ bool AP_RangeFinder_VL53L0X::init()
     write_register(SYSTEM_SEQUENCE_CONFIG, 0x02);
     if (!performSingleRefCalibration(0x00)) {
         printf("VL53L0X: Failed SingleRefCalibration2\n");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Failed SingleRefCalibration2");
         return false;
     }
 

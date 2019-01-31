@@ -38,9 +38,12 @@
 #include "AP_RangeFinder_PWM.h"
 #include <AP_BoardConfig/AP_BoardConfig.h>
 
+//#include <../ArduCopter/Copter.h>
+#include "AP_ServoRelayEvents/AP_ServoRelayEvents.h"
 #include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL &hal;
+//extern Copter copter;
 
 // table of user settable parameters
 const AP_Param::GroupInfo RangeFinder::var_info[] = {
@@ -578,11 +581,44 @@ RangeFinder::RangeFinder(AP_SerialManager &_serial_manager, enum Rotation orient
  */
 void RangeFinder::init(void)
 {
+    AP_ServoRelayEvents *handler = AP::servorelayevents();
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "call init()");
     if (num_instances != 0) {
         // init called a 2nd time?
         return;
     }
+    for (uint8_t i=0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+
+    	handler->do_set_relay(54+i,0);
+        state[i].address = 0x29+i;
+
+        {
+        	char buf[15];
+        	sprintf(buf, "address #%d: %d", i, (int)state[i].address);
+        	gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+        }
+        {
+        	char buf[15];
+        	sprintf(buf, "pin off #%d: %d", i, 54+i);
+        	gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+        }
+
+		//relay.off(54+i);
+    }
+    hal.scheduler->delay(100);
+
     for (uint8_t i=0, serial_instance = 0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+    	handler->do_set_relay(54+i,1);
+
+        {
+        	char buf[15];
+        	sprintf(buf, "pin on #%d: %d", i, 54+i);
+        	gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+        }
+
+//    	relay.on(54+i);
+        hal.scheduler->delay(100);
+
         // serial_instance will be increased inside detect_instance
         // if a serial driver is loaded for this instance
         detect_instance(i, serial_instance);
@@ -590,6 +626,7 @@ void RangeFinder::init(void)
             // we loaded a driver for this instance, so it must be
             // present (although it may not be healthy)
             num_instances = i+1;
+        	gcs().send_text(MAV_SEVERITY_CRITICAL, "ok");
         }
         // initialise pre-arm check variables
         state[i].pre_arm_check = false;
@@ -640,7 +677,12 @@ bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
  */
 void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
 {
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "detect_instance1");
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "call detect_instance()");
+	{
+		char buf[15];
+	    sprintf(buf, "type #%d: %d", (int)instance, (int)state[instance].type);
+	    gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+	}
 
     enum RangeFinder_Type _type = (enum RangeFinder_Type)state[instance].type.get();
     switch (_type) {
@@ -683,15 +725,23 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         break;
     case RangeFinder_TYPE_VL53L0X:
 
-    	gcs().send_text(MAV_SEVERITY_CRITICAL, "detect_instance2");
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, "call case");
+
+    	//hal.i2c_mgr->get_device(1, 0x29)->write_register(0x8A, state[instance].address & 0x7F);
+
+    	{
+    		char buf[15];
+    		sprintf(buf, "address #%d: %d", (int)instance, (int)(state[instance].address & 0x7F));
+    		gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
+    	}
 
         if (!_add_backend(AP_RangeFinder_VL53L0X::detect(state[instance],
-                                                         hal.i2c_mgr->get_device(1, 0x29)))) {
+        		                                        hal.i2c_mgr->get_device(1, state[instance].address)))) {
 
-        	gcs().send_text(MAV_SEVERITY_CRITICAL, "detect_instance3");
+        	gcs().send_text(MAV_SEVERITY_CRITICAL, "call if");
 
             _add_backend(AP_RangeFinder_VL53L0X::detect(state[instance],
-                                                        hal.i2c_mgr->get_device(0, 0x29)));
+                                                        hal.i2c_mgr->get_device(0, state[instance].address)));
         }
         break;
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
