@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <AP_RangeFinder/RangeFinder_Backend.h>
 
+#include <AP_RangeFinder/AP_RangeFinder_Params.h>
+#include <GCS_MAVLink/GCS.h>
+
 extern const AP_HAL::HAL& hal;
 
 AP_Proximity_RangeFinder::AP_Proximity_RangeFinder(AP_Proximity &_frontend,
@@ -41,42 +44,67 @@ void AP_Proximity_RangeFinder::update(void)
 
     uint32_t now = AP_HAL::millis();
 
+    char str[50];     //for 6 instanses
+    char loc[10];
+    strcpy(str, "prox: ");
+
+
     // look through all rangefinders
     for (uint8_t i=0; i < rngfnd->num_sensors(); i++) {
         AP_RangeFinder_Backend *sensor = rngfnd->get_backend(i);
         if (sensor == nullptr) {
             continue;
         }
-        if (sensor->has_data()) {
-            // check for horizontal range finders
-            if (sensor->orientation() <= ROTATION_YAW_315) {
-                uint8_t sector = (uint8_t)sensor->orientation();
-                _angle[sector] = sector * 45;
-                _distance[sector] = sensor->distance_cm() / 100.0f;
-                _distance_min = sensor->min_distance_cm() / 100.0f;
-                _distance_max = sensor->max_distance_cm() / 100.0f;
-                _distance_valid[sector] = (_distance[sector] >= _distance_min) && (_distance[sector] <= _distance_max);
-                _last_update_ms = now;
-                update_boundary_for_sector(sector);
+        // check for horizontal range finders
+        if (sensor->orientation() <= ROTATION_YAW_315) {
+            uint8_t sector = (uint8_t)sensor->orientation();
+            _angle[sector] = sector * 45;
+            _distance_min = sensor->min_distance_cm() / 100.0f;
+            _distance_max = sensor->max_distance_cm() / 100.0f;
+
+            uint32_t sensor_last_reading_ms = sensor->last_reading_ms();
+
+            if (now - sensor_last_reading_ms > 30) {
+            	sensor_last_reading_ms = now;
             }
-            // check upward facing range finder
-            if (sensor->orientation() == ROTATION_PITCH_90) {
-                int16_t distance_upward = sensor->distance_cm();
-                int16_t up_distance_min = sensor->min_distance_cm();
-                int16_t up_distance_max = sensor->max_distance_cm();
-                if ((distance_upward >= up_distance_min) && (distance_upward <= up_distance_max)) {
-                    _distance_upward = distance_upward * 1e2;
-                } else {
-                    _distance_upward = -1.0; // mark an valid reading
-                }
-                _last_upward_update_ms = now;
+
+            float sensor_data;
+            if (sensor->has_data()) {
+            	sensor_data = sensor->distance_cm() / 100.0f;
+            } else {
+            	sensor_data = _distance_max - 0.01f;
             }
+
+            _distance_bufs[sector].add_value(sensor_data, sensor_last_reading_ms);
+            _distance[sector] = _distance_bufs[sector].get_median();
+
+            sprintf(loc, "%d ", (int)(_distance[sector] * 100.0f));
+
+
+            _distance_valid[sector] = (_distance[sector] >= _distance_min) && (_distance[sector] <= _distance_max);
+            _last_update_ms = now;
+            update_boundary_for_sector(sector);
         }
+        // check upward facing range finder
+        if (sensor->orientation() == ROTATION_PITCH_90) {
+            int16_t distance_upward = sensor->distance_cm();
+            int16_t up_distance_min = sensor->min_distance_cm();
+            int16_t up_distance_max = sensor->max_distance_cm();
+            if ((distance_upward >= up_distance_min) && (distance_upward <= up_distance_max)) {
+                _distance_upward = distance_upward * 1e2;
+            } else {
+                _distance_upward = -1.0; // mark an valid reading
+            }
+            _last_upward_update_ms = now;
+        }
+       	strcat(str, loc);
     }
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 
     // check for timeout and set health status
     if ((_last_update_ms == 0) || (now - _last_update_ms > PROXIMITY_RANGEFIDER_TIMEOUT_MS)) {
         set_status(AP_Proximity::Proximity_NoData);
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "Proximity_NoData");
     } else {
         set_status(AP_Proximity::Proximity_Good);
     }
