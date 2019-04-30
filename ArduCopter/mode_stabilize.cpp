@@ -1,5 +1,8 @@
 #include "Copter.h"
 
+#include <GCS_MAVLink/GCS.h>
+#include <stdio.h>
+
 /*
  * Init and run calls for stabilize flight mode
  */
@@ -46,6 +49,12 @@ void Copter::ModeStabilize::run()
 
     // get pilot's desired throttle
     pilot_throttle_scaled = get_pilot_desired_throttle(channel_throttle->get_control_in());
+
+#if AC_AVOID_ENABLED == ENABLED
+        // apply avoidance
+        copter.avoid.adjust_roll_pitch(target_roll, target_pitch, copter.aparm.angle_max);
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "rl: %f, pc: %f, ag: %f", (double)target_roll, (double)target_pitch, (double)copter.aparm.angle_max);
+#endif
 
     // call attitude controller
     attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(target_roll, target_pitch, target_yaw_rate);
