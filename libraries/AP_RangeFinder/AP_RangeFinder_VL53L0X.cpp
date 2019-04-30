@@ -25,6 +25,7 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/utility/sparse-endian.h>
 #include <stdio.h>
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -216,8 +217,8 @@ const AP_RangeFinder_VL53L0X::RegData AP_RangeFinder_VL53L0X::tuning_data[] =
    constructor is not called until detect() returns true, so we
    already know that we should setup the rangefinder
 */
-AP_RangeFinder_VL53L0X::AP_RangeFinder_VL53L0X(RangeFinder::RangeFinder_State &_state, AP_HAL::OwnPtr<AP_HAL::I2CDevice> _dev)
-    : AP_RangeFinder_Backend(_state)
+AP_RangeFinder_VL53L0X::AP_RangeFinder_VL53L0X(RangeFinder::RangeFinder_State &_state, AP_RangeFinder_Params &_params, AP_HAL::OwnPtr<AP_HAL::I2CDevice> _dev)
+    : AP_RangeFinder_Backend(_state, _params)
     , dev(std::move(_dev)) {}
 
 
@@ -226,13 +227,25 @@ AP_RangeFinder_VL53L0X::AP_RangeFinder_VL53L0X(RangeFinder::RangeFinder_State &_
    trying to take a reading on I2C. If we get a result the sensor is
    there.
 */
-AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_State &_state, AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev)
+AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_State &_state, AP_RangeFinder_Params &_params, AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev)
 {
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "addresses: %d %d", (int)_params.address, (int)dev->get_bus_address());
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "dev: %d", (!dev ? 0 : 1));
+
 	if(!dev){
 		return nullptr;
 	}
+//	dev->write_register(0x8A, 0x30 & 0x7F);
+//	dev->set_address(0x30);
+//	{
+//		uint8_t v = 17;
+//	    dev->read_registers(0x8A, &v, 1);
+//	    gcs().send_text(MAV_SEVERITY_CRITICAL, "readln: %d", (int)(v));
+//	}
     AP_RangeFinder_VL53L0X *sensor
-        = new AP_RangeFinder_VL53L0X(_state, std::move(dev));
+        = new AP_RangeFinder_VL53L0X(_state, _params, std::move(dev));
+
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "sensor: %d", (!sensor ? 0 : 1));
 
     if (!sensor) {
         delete sensor;
@@ -241,6 +254,9 @@ AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_
 
     sensor->dev->get_semaphore()->take_blocking();
     
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "check_id: %d", (!sensor->check_id() ? 0 : 1));
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "sensor->init: %d", (!sensor->init() ? 0 : 1));
+
     if (!sensor->check_id() || !sensor->init()) {
         sensor->dev->get_semaphore()->give();
         delete sensor;
@@ -248,7 +264,9 @@ AP_RangeFinder_Backend *AP_RangeFinder_VL53L0X::detect(RangeFinder::RangeFinder_
     }
 
     sensor->dev->get_semaphore()->give();
-    
+
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "detected");
+
     return sensor;
 }
 
@@ -295,6 +313,8 @@ bool AP_RangeFinder_VL53L0X::get_SPAD_info(uint8_t * count, bool *type_is_apertu
         }
         hal.scheduler->delay(1);
     }
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "try: %d", (50-tries));
+
     write_register(0x83, 0x01);
     tmp = read_register(0x92);
 
