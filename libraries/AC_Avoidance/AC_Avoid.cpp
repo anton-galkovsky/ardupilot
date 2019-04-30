@@ -1,5 +1,9 @@
 #include "AC_Avoid.h"
 
+#include <AP_HAL/AP_HAL.h>
+#include <GCS_MAVLink/GCS.h>
+#include <stdio.h>
+
 #if APM_BUILD_TYPE(APM_BUILD_APMrover2)
  # define AP_AVOID_BEHAVE_DEFAULT AC_Avoid::BehaviourType::BEHAVIOR_STOP
 #else
@@ -183,17 +187,21 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     }
 }
 
+#define ALPHA 0.9 //0.995
+
 // adjust roll-pitch to push vehicle away from objects
 // roll and pitch value are in centi-degrees
 void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
 {
     // exit immediately if proximity based avoidance is disabled
     if ((_enabled & AC_AVOID_USE_PROXIMITY_SENSOR) == 0 || !_proximity_enabled) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "!(_enabled & AC_AVOID_USE_PROXIMITY_SENSOR) == 0 || !_proximity_enabled)");
         return;
     }
 
     // exit immediately if angle max is zero
     if (_angle_max <= 0.0f || veh_angle_max <= 0.0f) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "!(_angle_max <= 0.0f || veh_angle_max <= 0.0f)");
         return;
     }
 
@@ -206,7 +214,56 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     get_proximity_roll_pitch_pct(roll_positive, roll_negative, pitch_positive, pitch_negative);
 
     // add maximum positive and negative percentages together for roll and pitch, convert to centi-degrees
-    Vector2f rp_out((roll_positive + roll_negative) * 4500.0f, (pitch_positive + pitch_negative) * 4500.0f);
+//    Vector2f rp_out((roll_positive + roll_negative) * 4500.0f, (pitch_positive + pitch_negative) * 4500.0f);
+
+    float rp_out_roll = (roll_positive + roll_negative) * 2500.0f;
+    float rp_out_pitch = (pitch_positive + pitch_negative) * 2500.0f;
+    uint32_t time = AP_HAL::millis();
+
+    static float rp_out_roll_old = rp_out_roll;
+    static float rp_out_pitch_old = rp_out_pitch;
+    static uint32_t time_old = 0;
+
+
+    float alpha = 1.0f;
+    if (time - time_old > 500) {
+    	alpha = 0;
+    } else {
+    	for (uint32_t i = 0; i < time - time_old; i++) {
+    		alpha *= ALPHA;
+    	}
+    }
+    float rp_out_x = alpha * rp_out_roll_old + (1 - alpha) * rp_out_roll;
+    float rp_out_y = alpha * rp_out_pitch_old + (1 - alpha) * rp_out_pitch;
+    Vector2f rp_out(rp_out_x, rp_out_y);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.1f,%4.1f,%4.1f,%4.1f,%d",
+//    		(double)rp_out_roll, (double)rp_out_pitch, (double)rp_out_x, (double)rp_out_y, time - time_old);
+
+    rp_out_roll_old = rp_out_x;
+    rp_out_pitch_old = rp_out_y;
+    time_old = time;
+
+
+//    	float rp_out_roll_der = 4 * (rp_out_roll - rp_out_roll_old) / MAX(time - time_old, (uint32_t)1);
+//    	float rp_out_pitch_der = 4 * (rp_out_pitch - rp_out_pitch_old) / MAX(time - time_old, (uint32_t)1);
+//    	Vector2f rp_out(rp_out_roll - rp_out_roll_der, rp_out_pitch - rp_out_pitch_der);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.1f,%4.1f,%4.1f,%4.1f,%4.1f,%4.1f,%d",
+//    		(double)rp_out_roll, (double)rp_out_pitch, (double)rp_out_roll_der, (double)rp_out_pitch_der, (double)rp_out_roll_old, (double)rp_out_pitch_old, time - time_old);
+
+//    if (abs(rp_out_roll) < 0.0000001f && abs(rp_out_pitch) < 0.0000001f) {
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "rp_out_roll == 0.0f && rp_out_pitch == 0.0f");
+//    }
+
+//
+//    rp_out_roll_old = rp_out_roll;
+//    rp_out_pitch_old = rp_out_pitch;
+//    time_old = time;
+
+
+    //    gcs().send_text(MAV_SEVERITY_CRITICAL, "x: %f, y: %f, ag: %f", (double)rp_out.x, (double)rp_out.y, (double)veh_angle_max);
+
 
     // apply avoidance angular limits
     // the object avoidance lean angle is never more than 75% of the total angle-limit to allow the pilot to override
@@ -219,6 +276,7 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     // add passed in roll, pitch angles
     rp_out.x += roll;
     rp_out.y += pitch;
+
 
     // apply total angular limits
     vec_len = rp_out.length();
@@ -528,6 +586,9 @@ float AC_Avoid::distance_to_lean_pct(float dist_m)
     if (dist_m < 0.0f || dist_m >= _dist_max || _dist_max <= 0.0f) {
         return 0.0f;
     }
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_max:%f, dist_m:%f", (double)_dist_max, (double)dist_m);
+
     // inverted but linear response
     return 1.0f - (dist_m / _dist_max);
 }
@@ -537,6 +598,7 @@ void AC_Avoid::get_proximity_roll_pitch_pct(float &roll_positive, float &roll_ne
 {
     // exit immediately if proximity sensor is not present
     if (_proximity.get_status() != AP_Proximity::Proximity_Good) {
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, "! AP_Proximity::Proximity_Good");
         return;
     }
 
@@ -544,14 +606,24 @@ void AC_Avoid::get_proximity_roll_pitch_pct(float &roll_positive, float &roll_ne
 
     // if no objects return
     if (obj_count == 0) {
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, "obj_count == 0");
         return;
     }
+
+//    bool b = true;
 
     // calculate maximum roll, pitch values from objects
     for (uint8_t i=0; i<obj_count; i++) {
         float ang_deg, dist_m;
         if (_proximity.get_object_angle_and_distance(i, ang_deg, dist_m)) {
+//
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "i: %d, ang_deg: %f, dist_m: %f", i, (double)ang_deg, (double)dist_m);
+//
+//            gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_max:%f, dist_m:%f", (double)_dist_max, (double)dist_m);
+
             if (dist_m < _dist_max) {
+//            	b = false;
+
                 // convert distance to lean angle (in 0 to 1 range)
                 const float lean_pct = distance_to_lean_pct(dist_m);
                 // convert angle to roll and pitch lean percentages
@@ -569,9 +641,17 @@ void AC_Avoid::get_proximity_roll_pitch_pct(float &roll_positive, float &roll_ne
                 } else if (pitch_pct < 0.0f) {
                     pitch_negative = MIN(pitch_negative, pitch_pct);
                 }
+
+//                gcs().send_text(MAV_SEVERITY_CRITICAL, "l:%f,a:%f,r:%f,p:%f", lean_pct, angle_rad, roll_pct, pitch_pct);
             }
         }
     }
+
+//    if (b) {
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_m[] >= _dist_max");
+//    }
+//
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "rlp:%f,rln:%f,pcp:%f,pcn:%f", roll_positive, roll_negative, pitch_positive, pitch_negative);
 }
 
 // singleton instance
