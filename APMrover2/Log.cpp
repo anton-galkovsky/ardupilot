@@ -49,9 +49,6 @@ void Rover::Log_Write_Attitude()
     if (g2.motors.has_sail()) {
         DataFlash.Log_Write_PID(LOG_PIDR_MSG, g2.attitude_control.get_sailboat_heel_pid().get_pid_info());
     }
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    sitl.Log_Write_SIMSTATE(&DataFlash);
-#endif
 }
 
 // Write a range finder depth message
@@ -215,7 +212,7 @@ void Rover::Log_Write_Startup(uint8_t type)
         LOG_PACKET_HEADER_INIT(LOG_STARTUP_MSG),
         time_us         : AP_HAL::micros64(),
         startup_type    : type,
-        command_total   : mode_auto.mission.num_commands()
+        command_total   : mission.num_commands()
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }

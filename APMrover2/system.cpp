@@ -39,6 +39,8 @@ void Rover::init_ardupilot()
     g2.stats.init();
 #endif
 
+    gcs().set_dataflash(&DataFlash);
+
     mavlink_system.sysid = g.sysid_this_mav;
 
     // initialise serial ports
@@ -181,10 +183,11 @@ void Rover::startup_ground(void)
     startup_INS_ground();
 
     // initialise mission library
-    mode_auto.mission.init();
+    mission.init();
 
     // initialise DataFlash library
 #if LOGGING_ENABLED == ENABLED
+    DataFlash.set_mission(&mission);
     DataFlash.setVehicle_Startup_Log_Writer(
         FUNCTOR_BIND(&rover, &Rover::Log_Write_Vehicle_Startup_Messages, void)
         );
@@ -353,7 +356,7 @@ bool Rover::disarm_motors(void)
     }
     if (control_mode != &mode_auto) {
         // reset the mission on disarm if we are not in auto
-        mode_auto.mission.reset();
+        mission.reset();
     }
 
     // only log if disarming was successful

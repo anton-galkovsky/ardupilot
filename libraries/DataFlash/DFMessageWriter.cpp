@@ -134,6 +134,12 @@ void DFMessageWriter_WriteSysInfo::reset()
     stage = ws_blockwriter_stage_init;
 }
 
+void DFMessageWriter_DFLogStart::set_mission(const AP_Mission *mission)
+{
+    _writeentiremission.set_mission(mission);
+}
+
+
 void DFMessageWriter_WriteSysInfo::process() {
     const AP_FWVersion &fwver = AP::fwversion();
 
@@ -182,12 +188,6 @@ void DFMessageWriter_WriteSysInfo::process() {
 }
 
 void DFMessageWriter_WriteEntireMission::process() {
-    const AP_Mission *_mission = AP::mission();
-    if (_mission == nullptr) {
-        _finished = true;
-        return;
-    }
-
     switch(stage) {
 
     case em_blockwriter_stage_init:
@@ -233,4 +233,10 @@ void DFMessageWriter_WriteEntireMission::reset()
     DFMessageWriter::reset();
     stage = em_blockwriter_stage_init;
     _mission_number_to_send = 0;
+}
+
+
+void DFMessageWriter_WriteEntireMission::set_mission(const AP_Mission *mission)
+{
+    _mission = mission;
 }

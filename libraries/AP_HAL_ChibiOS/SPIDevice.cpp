@@ -320,6 +320,7 @@ SPIDeviceManager::get_device(const char *name)
         }
     }
     if (i == ARRAY_SIZE(device_table)) {
+        printf("SPI: Invalid device name: %s\n", name);
         return AP_HAL::OwnPtr<AP_HAL::SPIDevice>(nullptr);
     }
 

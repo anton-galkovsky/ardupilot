@@ -152,7 +152,7 @@ void Plane::send_fence_status(mavlink_channel_t chan)
 #endif
 
 
-void Plane::send_sys_status(mavlink_channel_t chan)
+void Plane::send_extended_status1(mavlink_channel_t chan)
 {
     int16_t battery_current = -1;
     int8_t battery_remaining = -1;
@@ -434,11 +434,9 @@ bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
     switch (id) {
 
     case MSG_EXTENDED_STATUS1:
-        if (PAYLOAD_SIZE(chan, SYS_STATUS) +
-            PAYLOAD_SIZE(chan, POWER_STATUS) > comm_get_txspace(chan)) {
-            return false;
-        }
-        plane.send_sys_status(chan);
+        CHECK_PAYLOAD_SIZE(SYS_STATUS);
+        plane.send_extended_status1(chan);
+        CHECK_PAYLOAD_SIZE2(POWER_STATUS);
         send_power_status();
         break;
 
@@ -605,17 +603,13 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
 };
 
 static const ap_message STREAM_RAW_SENSORS_msgs[] = {
-    MSG_RAW_IMU,
-    MSG_SCALED_IMU2,
-    MSG_SCALED_IMU3,
-    MSG_SCALED_PRESSURE,
-    MSG_SCALED_PRESSURE2,
-    MSG_SCALED_PRESSURE3,
-    MSG_SENSOR_OFFSETS
+    MSG_RAW_IMU1,  // RAW_IMU, SCALED_IMU2, SCALED_IMU3
+    MSG_RAW_IMU2,  // SCALED_PRESSURE, SCALED_PRESSURE2, SCALED_PRESSURE3
+    MSG_RAW_IMU3  // SENSOR_OFFSETS
 };
 static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_EXTENDED_STATUS1, // SYS_STATUS, POWER_STATUS
-    MSG_MEMINFO,
+    MSG_EXTENDED_STATUS2, // MEMINFO
     MSG_CURRENT_WAYPOINT,
     MSG_GPS_RAW,
     MSG_GPS_RTK,
@@ -667,9 +661,6 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
     MSG_EKF_STATUS_REPORT,
     MSG_VIBRATION,
 };
-static const ap_message STREAM_PARAMS_msgs[] = {
-    MSG_NEXT_PARAM
-};
 static const ap_message STREAM_ADSB_msgs[] = {
     MSG_ADSB_VEHICLE
 };
@@ -683,7 +674,6 @@ const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
     MAV_STREAM_ENTRY(STREAM_EXTRA1),
     MAV_STREAM_ENTRY(STREAM_EXTRA2),
     MAV_STREAM_ENTRY(STREAM_EXTRA3),
-    MAV_STREAM_ENTRY(STREAM_PARAMS),
     MAV_STREAM_ENTRY(STREAM_ADSB),
     MAV_STREAM_TERMINATOR // must have this at end of stream_entries
 };
@@ -1477,8 +1467,8 @@ void Plane::mavlink_delay_cb()
     }
     if (tnow - last_50hz > 20) {
         last_50hz = tnow;
-        gcs().update_receive();
-        gcs().update_send();
+        gcs().update();
+        gcs().data_stream_send();
         notify.update();
     }
     if (tnow - last_5s > 5000) {
@@ -1509,6 +1499,11 @@ bool GCS_MAVLINK_Plane::accept_packet(const mavlink_status_t &status, mavlink_me
         return true;
     }
     return (msg.sysid == plane.g.sysid_my_gcs);
+}
+
+AP_Mission *GCS_MAVLINK_Plane::get_mission()
+{
+    return &plane.mission;
 }
 
 void GCS_MAVLINK_Plane::handle_mission_set_current(AP_Mission &mission, mavlink_message_t *msg)

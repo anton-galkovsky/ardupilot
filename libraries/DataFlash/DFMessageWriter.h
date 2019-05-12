@@ -43,6 +43,8 @@ public:
     void reset() override;
     void process() override;
 
+    void set_mission(const AP_Mission *mission);
+
 private:
     enum entire_mission_blockwriter_stage {
         em_blockwriter_stage_init,
@@ -51,6 +53,7 @@ private:
         em_blockwriter_stage_done
     };
 
+    const AP_Mission *_mission = nullptr;
     uint16_t _mission_number_to_send = 0;
     entire_mission_blockwriter_stage stage = em_blockwriter_stage_init;
 };
@@ -72,6 +75,8 @@ public:
     void reset() override;
     void process() override;
     bool fmt_done() { return _fmt_done; }
+
+    void set_mission(const AP_Mission *mission);
 
 private:
 

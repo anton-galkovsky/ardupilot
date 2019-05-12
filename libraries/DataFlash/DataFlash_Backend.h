@@ -47,6 +47,8 @@ public:
 
     virtual void Init() { }
 
+    void set_mission(const AP_Mission *mission);
+
     virtual uint32_t bufferspace_available() = 0;
 
     virtual void PrepForArming() { }

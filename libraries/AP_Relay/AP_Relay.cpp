@@ -132,15 +132,15 @@ void AP_Relay::init()
 
 void AP_Relay::on(uint8_t relay) 
 {    
-	for (int i = 0; i < 4; i++) {
-    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin #%d: %d", i, (int)_pin[i]);
-	}
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin def: %d", (int)_default);
+//	for (int i = 0; i < 4; i++) {
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin #%d: %d", i, (int)_pin[i]);
+//	}
+//	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin def: %d", (int)_default);
 
     if (relay < AP_RELAY_NUM_RELAYS && _pin[relay] != -1) {
         hal.gpio->pinMode(_pin[relay], HAL_GPIO_OUTPUT);
         hal.gpio->write(_pin[relay], 1);
-//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin on: %d", _pin[relay]);
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin on: %d", _pin[relay]);
     }
 }
 
@@ -150,7 +150,7 @@ void AP_Relay::off(uint8_t relay)
     if (relay < AP_RELAY_NUM_RELAYS && _pin[relay] != -1) {
         hal.gpio->pinMode(_pin[relay], HAL_GPIO_OUTPUT);
         hal.gpio->write(_pin[relay], 0);
-//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin off: %d", _pin[relay]);
+    	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin off: %d", _pin[relay]);
     }
 }
 

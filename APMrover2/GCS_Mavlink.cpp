@@ -75,7 +75,7 @@ MAV_STATE GCS_MAVLINK_Rover::system_status() const
     return MAV_STATE_ACTIVE;
 }
 
-void Rover::send_sys_status(mavlink_channel_t chan)
+void Rover::send_extended_status1(mavlink_channel_t chan)
 {
     int16_t battery_current = -1;
     int8_t battery_remaining = -1;
@@ -105,14 +105,14 @@ void Rover::send_nav_controller_output(mavlink_channel_t chan)
 {
     mavlink_msg_nav_controller_output_send(
         chan,
-        0,  // roll
-        degrees(g2.attitude_control.get_desired_pitch()),
-        control_mode->nav_bearing(),
-        control_mode->wp_bearing(),
+        g2.attitude_control.get_desired_lat_accel(),
+        ahrs.groundspeed() * ins.get_gyro().z,  // use nav_pitch to hold actual Y accel
+        nav_controller->nav_bearing_cd() * 0.01f,
+        nav_controller->target_bearing_cd() * 0.01f,
         MIN(control_mode->get_distance_to_destination(), UINT16_MAX),
         0,
         control_mode->speed_error(),
-        control_mode->crosstrack_error());
+        nav_controller->crosstrack_error());
 }
 
 void Rover::send_servo_out(mavlink_channel_t chan)
@@ -319,18 +319,18 @@ bool GCS_MAVLINK_Rover::try_send_message(enum ap_message id)
         // send extended status only once vehicle has been initialised
         // to avoid unnecessary errors being reported to user
         if (initialised) {
-            if (PAYLOAD_SIZE(chan, SYS_STATUS) +
-                PAYLOAD_SIZE(chan, POWER_STATUS) > comm_get_txspace(chan)) {
-                return false;
-            }
-            rover.send_sys_status(chan);
+            CHECK_PAYLOAD_SIZE(SYS_STATUS);
+            rover.send_extended_status1(chan);
+            CHECK_PAYLOAD_SIZE(POWER_STATUS);
             send_power_status();
         }
         break;
 
     case MSG_NAV_CONTROLLER_OUTPUT:
-        CHECK_PAYLOAD_SIZE(NAV_CONTROLLER_OUTPUT);
-        rover.send_nav_controller_output(chan);
+        if (rover.control_mode->is_autopilot_mode()) {
+            CHECK_PAYLOAD_SIZE(NAV_CONTROLLER_OUTPUT);
+            rover.send_nav_controller_output(chan);
+        }
         break;
 
     case MSG_SERVO_OUT:
@@ -466,17 +466,13 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
 };
 
 static const ap_message STREAM_RAW_SENSORS_msgs[] = {
-    MSG_RAW_IMU,
-    MSG_SCALED_IMU2,
-    MSG_SCALED_IMU3,
-    MSG_SCALED_PRESSURE,
-    MSG_SCALED_PRESSURE2,
-    MSG_SCALED_PRESSURE3,
-    MSG_SENSOR_OFFSETS
+    MSG_RAW_IMU1,  // RAW_IMU, SCALED_IMU2, SCALED_IMU3
+    MSG_RAW_IMU2,  // BARO
+    MSG_RAW_IMU3  // SENSOR_OFFSETS
 };
 static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_EXTENDED_STATUS1, // SYS_STATUS, POWER_STATUS
-    MSG_MEMINFO,
+    MSG_EXTENDED_STATUS2, // MEMINFO
     MSG_CURRENT_WAYPOINT,
     MSG_GPS_RAW,
     MSG_GPS_RTK,
@@ -520,9 +516,6 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
     MSG_RPM,
     MSG_ESC_TELEMETRY,
 };
-static const ap_message STREAM_PARAMS_msgs[] = {
-    MSG_NEXT_PARAM
-};
 
 const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
     MAV_STREAM_ENTRY(STREAM_RAW_SENSORS),
@@ -533,7 +526,6 @@ const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
     MAV_STREAM_ENTRY(STREAM_EXTRA1),
     MAV_STREAM_ENTRY(STREAM_EXTRA2),
     MAV_STREAM_ENTRY(STREAM_EXTRA3),
-    MAV_STREAM_ENTRY(STREAM_PARAMS),
     MAV_STREAM_TERMINATOR // must have this at end of stream_entries
 };
 
@@ -1178,8 +1170,8 @@ void Rover::mavlink_delay_cb()
     }
     if (tnow - last_50hz > 20) {
         last_50hz = tnow;
-        gcs().update_receive();
-        gcs().update_send();
+        gcs().update();
+        gcs().data_stream_send();
         notify.update();
     }
     if (tnow - last_5s > 5000) {
@@ -1220,6 +1212,11 @@ AP_VisualOdom *GCS_MAVLINK_Rover::get_visual_odom() const
 #else
     return nullptr;
 #endif
+}
+
+AP_Mission *GCS_MAVLINK_Rover::get_mission()
+{
+    return &rover.mission;
 }
 
 AP_Rally *GCS_MAVLINK_Rover::get_rally() const

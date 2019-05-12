@@ -191,21 +191,18 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     // @DisplayName: Antenna X position offset
     // @Description: X position of the first GPS antenna in body frame. Positive X is forward of the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
 
     // @Param: POS1_Y
     // @DisplayName: Antenna Y position offset
     // @Description: Y position of the first GPS antenna in body frame. Positive Y is to the right of the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
 
     // @Param: POS1_Z
     // @DisplayName: Antenna Z position offset
     // @Description: Z position of the first GPS antenna in body frame. Positive Z is down from the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
     AP_GROUPINFO("POS1", 16, AP_GPS, _antenna_offset[0], 0.0f),
 
@@ -213,21 +210,18 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     // @DisplayName: Antenna X position offset
     // @Description: X position of the second GPS antenna in body frame. Positive X is forward of the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
 
     // @Param: POS2_Y
     // @DisplayName: Antenna Y position offset
     // @Description: Y position of the second GPS antenna in body frame. Positive Y is to the right of the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
 
     // @Param: POS2_Z
     // @DisplayName: Antenna Z position offset
     // @Description: Z position of the second GPS antenna in body frame. Positive Z is down from the origin. Use antenna phase centroid location if provided by the manufacturer.
     // @Units: m
-    // @Range: -10 10
     // @User: Advanced
     AP_GROUPINFO("POS2", 17, AP_GPS, _antenna_offset[1], 0.0f),
 
@@ -609,7 +603,7 @@ void AP_GPS::update_instance(uint8_t instance)
 
     // we have an active driver for this instance
     bool result = drivers[instance]->read();
-    uint32_t tnow = AP_HAL::millis();
+    const uint32_t tnow = AP_HAL::millis();
 
     // if we did not get a message, and the idle timer of 2 seconds
     // has expired, re-initialise the GPS. This will cause GPS
@@ -638,12 +632,6 @@ void AP_GPS::update_instance(uint8_t instance)
             data_should_be_logged = true;
         }
     } else {
-        if (state[instance].uart_timestamp_ms != 0) {
-            // set the timestamp for this messages based on
-            // set_uart_timestamp() in backend, if available
-            tnow = state[instance].uart_timestamp_ms;
-            state[instance].uart_timestamp_ms = 0;
-        }
         // delta will only be correct after parsing two messages
         timing[instance].delta_time_ms = tnow - timing[instance].last_message_time_ms;
         timing[instance].last_message_time_ms = tnow;

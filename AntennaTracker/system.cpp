@@ -22,6 +22,8 @@ void Tracker::init_tracker()
     // Check the EEPROM format version before loading any parameters from EEPROM
     load_parameters();
 
+    gcs().set_dataflash(&DataFlash);
+
     mavlink_system.sysid = g.sysid_this_mav;
 
     // initialise serial ports

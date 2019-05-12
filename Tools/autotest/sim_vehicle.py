@@ -539,13 +539,9 @@ def start_vehicle(binary, autotest, opts, stuff, loc):
     if opts.valgrind:
         cmd_name += " (valgrind)"
         cmd.append("valgrind")
-        # adding this option allows valgrind to cope with the overload
-        # of operator new
-        cmd.append("--soname-synonyms=somalloc=nouserintercepts")
     if opts.callgrind:
         cmd_name += " (callgrind)"
-        cmd.append("valgrind")
-        cmd.append("--tool=callgrind")
+        cmd.append("valgrind --tool=callgrind")
     if opts.gdb or opts.gdb_stopped:
         cmd_name += " (gdb)"
         cmd.append("gdb")
@@ -601,6 +597,8 @@ def start_vehicle(binary, autotest, opts, stuff, loc):
         cmd.extend(["--defaults", path])
 
     run_in_terminal_window(autotest, cmd_name, cmd)
+    import time
+    time.sleep(12)
 
 
 def start_mavproxy(opts, stuff):

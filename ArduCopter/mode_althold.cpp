@@ -134,11 +134,13 @@ void Copter::ModeAltHold::run()
         break;
 
     case AltHold_Flying:
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "FLY");
         motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
 #if AC_AVOID_ENABLED == ENABLED
         // apply avoidance
         copter.avoid.adjust_roll_pitch(target_roll, target_pitch, copter.aparm.angle_max);
+//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "rl: %f, pc: %f, ag: %f", (double)target_roll, (double)target_pitch, (double)copter.aparm.angle_max);
 #endif
 
         // call attitude controller

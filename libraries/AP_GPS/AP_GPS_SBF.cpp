@@ -284,7 +284,6 @@ AP_GPS_SBF::process_message(void)
             state.time_week_ms = (uint32_t)(temp.TOW);
         }
 
-        check_new_itow(temp.TOW, sbf_msg.length);
         state.last_gps_time_ms = AP_HAL::millis();
 
         // Update velocity state (don't use −2·10^10)
@@ -361,7 +360,6 @@ AP_GPS_SBF::process_message(void)
     case DOP:
     {
         const msg4001 &temp = sbf_msg.data.msg4001u;
-        check_new_itow(temp.TOW, sbf_msg.length);
 
         state.hdop = temp.HDOP;
         state.vdop = temp.VDOP;
@@ -370,7 +368,6 @@ AP_GPS_SBF::process_message(void)
     case ReceiverStatus:
     {
         const msg4014 &temp = sbf_msg.data.msg4014u;
-        check_new_itow(temp.TOW, sbf_msg.length);
         RxState = temp.RxState;
         if ((RxError & RX_ERROR_MASK) != (temp.RxError & RX_ERROR_MASK)) {
             gcs().send_text(MAV_SEVERITY_INFO, "GPS %d: SBF error changed (0x%08x/0x%08x)", state.instance + 1,
@@ -383,7 +380,6 @@ AP_GPS_SBF::process_message(void)
     {
         const msg5908 &temp = sbf_msg.data.msg5908u;
 
-        check_new_itow(temp.TOW, sbf_msg.length);
         // select the maximum variance, as the EKF will apply it to all the columns in it's estimate
         // FIXME: Support returning the covariance matrix to the EKF
         float max_variance_squared = MAX(temp.Cov_VnVn, MAX(temp.Cov_VeVe, temp.Cov_VuVu));

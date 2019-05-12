@@ -58,7 +58,7 @@ class AP_Proximity_RangeFinder : public AP_Proximity_Backend
 
 public:
     // constructor
-    AP_Proximity_RangeFinder(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state);
+	AP_Proximity_RangeFinder(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state);
 
     // update state
     void update(void) override;
@@ -81,5 +81,10 @@ private:
     uint32_t _last_upward_update_ms;    // system time of last update distance
     float _distance_upward;             // upward distance in meters, negative if the last reading was out of range
 
-    distance_buf _distance_bufs[PROXIMITY_SECTORS_MAX];
+    uint32_t _last_downward_update_ms;
+    float _distance_downward;
+
+    distance_buf _horizontal_distance_bufs[PROXIMITY_SECTORS_MAX];
+    distance_buf _upward_distance_buf;
+    distance_buf _downward_distance_buf;
 };

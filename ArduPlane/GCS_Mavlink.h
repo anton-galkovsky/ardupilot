@@ -16,6 +16,7 @@ protected:
 
     bool accept_packet(const mavlink_status_t &status, mavlink_message_t &msg) override;
 
+    AP_Mission *get_mission() override;
     void handle_mission_set_current(AP_Mission &mission, mavlink_message_t *msg) override;
 
     AP_AdvancedFailsafe *get_advanced_failsafe() const override;

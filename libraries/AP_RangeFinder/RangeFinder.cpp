@@ -365,18 +365,18 @@ void RangeFinder::update(void)
         }
     }
 
-    char str[50];     //for 6 instanses
-    char loc[5];
-    strcpy(str, "dist: ");
-    for (int i = 0; i < num_instances; i++) {
-       	if (drivers[i]->has_data()) {
-       		sprintf(loc, "%d ", drivers[i]->distance_cm());
-       	} else {
-       		sprintf(loc, "--- ");
-       	}
-       	strcat(str, loc);
-    }
-    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+//    char str[50];     //for 6 instanses
+//    char loc[5];
+//    strcpy(str, "dist: ");
+//    for (int i = 0; i < num_instances; i++) {
+//       	if (drivers[i]->has_data()) {
+//       		sprintf(loc, "%d ", drivers[i]->distance_cm());
+//       	} else {
+//       		sprintf(loc, "--- ");
+//       	}
+//       	strcat(str, loc);
+//    }
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
