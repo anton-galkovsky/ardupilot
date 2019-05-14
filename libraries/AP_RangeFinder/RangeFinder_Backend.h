@@ -33,7 +33,7 @@ public:
     // update the state structure
     virtual void update() = 0;
 
-    virtual void handle_msg(mavlink_message_t *msg) { return; }
+    virtual void handle_msg(mavlink_message_t *msg);
 
     void update_pre_arm_check();
 

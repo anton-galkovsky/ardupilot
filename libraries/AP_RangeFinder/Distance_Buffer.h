@@ -21,7 +21,7 @@
 class Distance_Buffer {
 
     static int compare(const void * a, const void * b) {
-        return *((float*)a) - *((float*)b);
+        return *((uint16_t*)a) - *((uint16_t*)b);
     }
 
 	const AP_RangeFinder_Backend *sensor;

@@ -59,6 +59,8 @@ void AP_Proximity_RangeFinder::update(void)
 
         float distance_min_m = sensor->min_distance_cm() / 100.0f;
         float distance_max_m = sensor->max_distance_cm() / 100.0f;
+//        float distance = sensor->get_smooth_buf_dist_cm() / 100.0f;
+        float distance = sensor->distance_cm() / 100.0f;
 
         // check for horizontal range finders
         if (sensor->orientation() <= ROTATION_YAW_315) {
@@ -67,7 +69,7 @@ void AP_Proximity_RangeFinder::update(void)
             _distance_min = distance_min_m;
             _distance_max = distance_max_m;
 
-            _distance[sector] = sensor->get_smooth_buf_dist_cm() / 100.0f;
+            _distance[sector] = distance;
 
             sprintf(loc, "%d ", (int)(_distance[sector] * 100.0f));
 
@@ -77,7 +79,7 @@ void AP_Proximity_RangeFinder::update(void)
         }
         // check upward facing range finder
         else if (sensor->orientation() == ROTATION_PITCH_90) {
-            _distance_upward = sensor->get_smooth_buf_dist_cm() / 100.0f;
+            _distance_upward = distance;
 
         	sprintf(loc, "%d ", (int)(_distance_upward * 100.0f));
 
@@ -88,7 +90,7 @@ void AP_Proximity_RangeFinder::update(void)
         }
         // check downward facing range finder
         else if (sensor->orientation() == ROTATION_PITCH_270) {
-           	_distance_downward = sensor->get_smooth_buf_dist_cm() / 100.0f;
+           	_distance_downward = distance;
 
            	sprintf(loc, "%d ", (int)(_distance_downward * 100.0f));
 

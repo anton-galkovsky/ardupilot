@@ -43,7 +43,6 @@ void Distance_Buffer::add_value(uint16_t val, uint32_t sensor_last_reading_ms) {
 
 	penult_value_cm = last_value_cm;
 	last_value_cm = sorted_buf[DISTANCE_BUFFER_LENGTH / 2];
-//	gcs().send_text(MAV_SEVERITY_CRITICAL, "%d ", last_value_cm);
 
 	value_derivative_cmms = (last_value_cm - penult_value_cm)
 			/ (last_measure_time_ms - penult_measure_time_ms);
@@ -64,7 +63,6 @@ void Distance_Buffer::add_sensor_data(uint32_t time) {
 	} else {
 		sensor_data = sensor->max_distance_cm() - 1;
 	}
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "%d ", sensor_data);
 	add_value(sensor_data, sensor_last_reading_ms);
 }
 

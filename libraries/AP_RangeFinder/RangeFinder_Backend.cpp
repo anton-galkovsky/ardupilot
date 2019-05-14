@@ -15,6 +15,7 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_SerialManager/AP_SerialManager.h>
 #include "RangeFinder.h"
 #include "RangeFinder_Backend.h"
 
@@ -28,6 +29,25 @@ AP_RangeFinder_Backend::AP_RangeFinder_Backend(RangeFinder::RangeFinder_State &_
         state(_state),
 		params(_params)
 {
+}
+
+void AP_RangeFinder_Backend::handle_msg(mavlink_message_t *msg) {
+	if (msg->msgid != MAVLINK_MSG_ID_DISTANCE_SENSOR) {
+		return;
+	}
+	mavlink_distance_sensor_t packet;
+	mavlink_msg_distance_sensor_decode(msg, &packet);
+
+	if (packet.orientation != orientation() || packet.type != params.type) {
+		return;
+	}
+
+	params.max_distance_cm = packet.max_distance;
+	params.min_distance_cm = packet.min_distance;
+	state.distance_cm = packet.current_distance;
+	state.status = RangeFinder::RangeFinder_Good;
+	state.last_reading_ms = AP_HAL::millis();
+
 }
 
 MAV_DISTANCE_SENSOR AP_RangeFinder_Backend::get_mav_distance_sensor_type() const {

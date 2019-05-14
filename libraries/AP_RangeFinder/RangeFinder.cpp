@@ -348,7 +348,6 @@ void RangeFinder::init(void)
  */
 void RangeFinder::update(void)
 {
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, "call update");
     for (uint8_t i=0; i<num_instances; i++) {
         if (drivers[i] != nullptr) {
             if (params[i].type == RangeFinder_TYPE_NONE) {
@@ -385,8 +384,8 @@ void RangeFinder::update(void)
 		}
 	}
 
-	bool pitch_points_floor = false;
-	bool roll_points_floor = false;
+//	bool pitch_points_floor = false;
+//	bool roll_points_floor = false;
 	if (downward_dist >= 0.0f) {
 		for (uint8_t i = 0; i < num_instances; i++) {
 			if (drivers[i] != nullptr && drivers[i]->has_data()) {
@@ -394,14 +393,16 @@ void RangeFinder::update(void)
 				if ((sector == ROTATION_NONE && ahrs.pitch < 0.0f)
 						|| (sector == ROTATION_YAW_180 && ahrs.pitch > 0.0f)) {
 					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)) - downward_dist) < 5.0f) {
-						pitch_points_floor = true;
+//						pitch_points_floor = true;
 //						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %f %f", (double)state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)), downward_dist);
+						state[i].distance_cm = 0;
 					}
 				} else if ((sector == ROTATION_YAW_90 && ahrs.roll > 0.0f)
 						|| (sector == ROTATION_YAW_270 && ahrs.roll < 0.0f)) {
-					if ((float)fabs(state[i].distance_cm * (float)(float)fabs(sinf(ahrs.roll)) - downward_dist) < 5.0f) {
-						roll_points_floor = true;
+					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.roll)) - downward_dist) < 5.0f) {
+//						roll_points_floor = true;
 //						gcs().send_text(MAV_SEVERITY_CRITICAL, "dr: %f %f", (double)state[i].distance_cm * (float)fabs(sinf(ahrs.roll)), downward_dist);
+						state[i].distance_cm = 0;
 					}
 				}
 			}
@@ -411,8 +412,9 @@ void RangeFinder::update(void)
 	for (uint8_t i = 0; i < num_instances; i++) {
 		if (drivers[i] != nullptr && drivers[i]->has_data()) {
 			uint8_t sector = (uint8_t) drivers[i]->orientation();
-			if (((sector == ROTATION_NONE || sector == ROTATION_YAW_180) && pitch_points_floor)
-					|| ((sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) && roll_points_floor)) {
+//			if (((sector == ROTATION_NONE || sector == ROTATION_YAW_180) && pitch_points_floor)
+//					|| ((sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) && roll_points_floor)) {
+			if (state[i].distance_cm == 0) {
 				state[i].distance_cm = params[i].max_distance_cm - 1;
 			} else {
 				float offset, pos = 0.0f, coef = 1.0f;
@@ -442,30 +444,32 @@ void RangeFinder::update(void)
 				state[i].distance_cm = MAX(state[i].distance_cm, params[i].min_distance_cm + 1);
 			}
 		}
-	}
-
-    uint32_t now = AP_HAL::millis();
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "t: %d", now);
-	for (uint8_t i = 0; i < num_instances; i++) {
-		if (drivers[i] != nullptr) {
-			drivers[i]->add_dist_to_buf(now);
+		if (drivers[i] != nullptr && !drivers[i]->has_data()) {
+			state[i].distance_cm = params[i].max_distance_cm - 1;
 		}
 	}
 
+//    uint32_t now = AP_HAL::millis();
+//	for (uint8_t i = 0; i < num_instances; i++) {
+//		if (drivers[i] != nullptr) {
+//			drivers[i]->add_dist_to_buf(now);
+//		}
+//	}
 
-    char str[50];     //log for 6 instanses
-    char loc[5];
-    strcpy(str, "dist: ");
-    for (int i = 0; i < num_instances; i++) {
-   		sprintf(loc, "%d ", drivers[i]->get_smooth_buf_dist_cm());
-//       	if (drivers[i]->has_data()) {
+
+//    char str[50];     //log for 6 instanses
+//    char loc[5];
+//    strcpy(str, "dist: ");
+//    for (int i = 0; i < num_instances; i++) {
+////   		sprintf(loc, "%d ", drivers[i]->get_smooth_buf_dist_cm());
+////       	if (drivers[i]->has_data()) {
 //       		sprintf(loc, "%d ", drivers[i]->distance_cm());
-//       	} else {
-//       		sprintf(loc, "--- ");
-//       	}
-       	strcat(str, loc);
-    }
-    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+////       	} else {
+////       		sprintf(loc, "--- ");
+////       	}
+//       	strcat(str, loc);
+//    }
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
