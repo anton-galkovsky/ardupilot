@@ -40,6 +40,7 @@
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include "AP_ServoRelayEvents/AP_ServoRelayEvents.h"
+#include <AP_AHRS/AP_AHRS.h>
 #include <GCS_MAVLink/GCS.h>
 #include <stdio.h>
 
@@ -296,10 +297,7 @@ void RangeFinder::convert_params(void) {
  */
 void RangeFinder::init(void)
 {
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "sinf(radians(90)) = %f", (double)sinf(radians(90)));
-
     AP_ServoRelayEvents *handler = AP::servorelayevents();
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "call init()");
     if (num_instances != 0) {
         // init called a 2nd time?
         return;
@@ -309,22 +307,20 @@ void RangeFinder::init(void)
     for (uint8_t i = 0; i < RANGEFINDER_MAX_INSTANCES; i++) {
     	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin off #%d: %d; result: %d", i, i, (handler->do_set_relay(i,1) == 1 ? 1 : 0));
     	params[i].address = 0x30 + i;
-//    	params[i].address = 0x29;
     	gcs().send_text(MAV_SEVERITY_CRITICAL, "address #%d: %d", i, (int)params[i].address);
     }
-    hal.scheduler->delay(100);
+    hal.scheduler->delay(50);
     for (uint8_t i = 0; i < RANGEFINDER_MAX_INSTANCES; i++) {
         	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin off #%d: %d; result: %d", i, i, (handler->do_set_relay(i,0) == 1 ? 1 : 0));
         	params[i].address = 0x30 + i;
-    //    	params[i].address = 0x29;
         	gcs().send_text(MAV_SEVERITY_CRITICAL, "address #%d: %d", i, (int)params[i].address);
         }
-        hal.scheduler->delay(100);
+        hal.scheduler->delay(50);
 
     for (uint8_t i=0, serial_instance = 0; i<RANGEFINDER_MAX_INSTANCES; i++) {
 
     	gcs().send_text(MAV_SEVERITY_CRITICAL, "pin on #%d: %d; result: %d", i, i, (handler->do_set_relay(i,1) == 1 ? 1 : 0));
-        hal.scheduler->delay(100);
+        hal.scheduler->delay(50);
 
         // serial_instance will be increased inside detect_instance
         // if a serial driver is loaded for this instance
@@ -352,6 +348,7 @@ void RangeFinder::init(void)
  */
 void RangeFinder::update(void)
 {
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "call update");
     for (uint8_t i=0; i<num_instances; i++) {
         if (drivers[i] != nullptr) {
             if (params[i].type == RangeFinder_TYPE_NONE) {
@@ -365,18 +362,110 @@ void RangeFinder::update(void)
         }
     }
 
-//    char str[50];     //for 6 instanses
-//    char loc[5];
-//    strcpy(str, "dist: ");
-//    for (int i = 0; i < num_instances; i++) {
+    float downward_dist = -1;
+	const AP_AHRS &ahrs = AP::ahrs();
+	for (uint8_t i = 0; i < num_instances; i++) {
+		if (drivers[i] != nullptr && drivers[i]->has_data()) {
+			uint8_t sector = (uint8_t) drivers[i]->orientation();
+			if (sector == ROTATION_NONE) {
+				state[i].distance_cm += params[i].pos_offset.get().x * 100.0f;
+			} else if (sector == ROTATION_YAW_180) {
+				state[i].distance_cm -= params[i].pos_offset.get().x * 100.0f;
+			} else if (sector == ROTATION_YAW_90) {
+				state[i].distance_cm += params[i].pos_offset.get().y * 100.0f;
+			} else if (sector == ROTATION_YAW_270) {
+				state[i].distance_cm -= params[i].pos_offset.get().y * 100.0f;
+			} else if (sector == ROTATION_PITCH_90) {
+				state[i].distance_cm -= params[i].pos_offset.get().z * 100.0f;
+			} else if (sector == ROTATION_PITCH_270) {
+				state[i].distance_cm += params[i].pos_offset.get().z * 100.0f;
+				downward_dist = state[i].distance_cm * 1
+						/ sqrtf(tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
+			}
+		}
+	}
+
+	bool pitch_points_floor = false;
+	bool roll_points_floor = false;
+	if (downward_dist >= 0.0f) {
+		for (uint8_t i = 0; i < num_instances; i++) {
+			if (drivers[i] != nullptr && drivers[i]->has_data()) {
+				uint8_t sector = (uint8_t) drivers[i]->orientation();
+				if ((sector == ROTATION_NONE && ahrs.pitch < 0.0f)
+						|| (sector == ROTATION_YAW_180 && ahrs.pitch > 0.0f)) {
+					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)) - downward_dist) < 5.0f) {
+						pitch_points_floor = true;
+//						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %f %f", (double)state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)), downward_dist);
+					}
+				} else if ((sector == ROTATION_YAW_90 && ahrs.roll > 0.0f)
+						|| (sector == ROTATION_YAW_270 && ahrs.roll < 0.0f)) {
+					if ((float)fabs(state[i].distance_cm * (float)(float)fabs(sinf(ahrs.roll)) - downward_dist) < 5.0f) {
+						roll_points_floor = true;
+//						gcs().send_text(MAV_SEVERITY_CRITICAL, "dr: %f %f", (double)state[i].distance_cm * (float)fabs(sinf(ahrs.roll)), downward_dist);
+					}
+				}
+			}
+		}
+	}
+
+	for (uint8_t i = 0; i < num_instances; i++) {
+		if (drivers[i] != nullptr && drivers[i]->has_data()) {
+			uint8_t sector = (uint8_t) drivers[i]->orientation();
+			if (((sector == ROTATION_NONE || sector == ROTATION_YAW_180) && pitch_points_floor)
+					|| ((sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) && roll_points_floor)) {
+				state[i].distance_cm = params[i].max_distance_cm - 1;
+			} else {
+				float offset, pos = 0.0f, coef = 1.0f;
+				offset = params[i].offset * 100.0f;
+				if (sector == ROTATION_NONE) {
+					pos = params[i].pos_offset.get().x * 100.0f;
+					coef = cosf(ahrs.pitch);
+				} else if (sector == ROTATION_YAW_180) {
+					pos = -params[i].pos_offset.get().x * 100.0f;
+					coef = cosf(ahrs.pitch);
+				} else if (sector == ROTATION_YAW_90) {
+					pos = params[i].pos_offset.get().y * 100.0f;
+					coef = cosf(ahrs.roll);
+				} else if (sector == ROTATION_YAW_270) {
+					pos = -params[i].pos_offset.get().y * 100.0f;
+					coef = cosf(ahrs.roll);
+				} else if (sector == ROTATION_PITCH_90) {
+					pos = -params[i].pos_offset.get().z * 100.0f;
+					coef = 1 / sqrtf(
+							tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
+				} else if (sector == ROTATION_PITCH_270) {
+					pos = params[i].pos_offset.get().z * 100.0f;
+					coef = 1 / sqrtf(
+							tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
+				}
+				state[i].distance_cm = (state[i].distance_cm - (pos + offset)) * coef;
+				state[i].distance_cm = MAX(state[i].distance_cm, params[i].min_distance_cm + 1);
+			}
+		}
+	}
+
+    uint32_t now = AP_HAL::millis();
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "t: %d", now);
+	for (uint8_t i = 0; i < num_instances; i++) {
+		if (drivers[i] != nullptr) {
+			drivers[i]->add_dist_to_buf(now);
+		}
+	}
+
+
+    char str[50];     //log for 6 instanses
+    char loc[5];
+    strcpy(str, "dist: ");
+    for (int i = 0; i < num_instances; i++) {
+   		sprintf(loc, "%d ", drivers[i]->get_smooth_buf_dist_cm());
 //       	if (drivers[i]->has_data()) {
 //       		sprintf(loc, "%d ", drivers[i]->distance_cm());
 //       	} else {
 //       		sprintf(loc, "--- ");
 //       	}
-//       	strcat(str, loc);
-//    }
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+       	strcat(str, loc);
+    }
+    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
@@ -402,10 +491,6 @@ bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)
  */
 void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
 {
-	gcs().send_text(MAV_SEVERITY_CRITICAL, "call detect_instance()");
-
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "type #%d: %d", (int)instance, (int)params[instance].type);
-
     enum RangeFinder_Type _type = (enum RangeFinder_Type)params[instance].type.get();
     switch (_type) {
     case RangeFinder_TYPE_PLI2C:
@@ -451,64 +536,12 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         }
         break;
     case RangeFinder_TYPE_VL53L0X:
-
-    	gcs().send_text(MAV_SEVERITY_CRITICAL, "call case");
-
             FOREACH_I2C(i) {
-
-            	gcs().send_text(MAV_SEVERITY_CRITICAL, "call case");
-
             	hal.i2c_mgr->get_device(1, 0x29)->write_register(0x8A, params[instance].address & 0x7F);
-
-
-//            	        {
-//            	        	uint8_t v = 0;
-//            	        	hal.i2c_mgr->get_device(1, params[instance].address)->read_registers(0x8A, &v, 1);
-////            	        	char buf[50];
-////            	        	sprintf(buf, "real address #%d: %d", (int)instance, (int)(v));
-////            	        	gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
-//            	        }
-//
-//            	    	{
-////            	    		char buf[50];
-////            	    		sprintf(buf, "address #%d: %d", (int)instance, (int)(params[instance].address & 0x7F));
-////            	    		gcs().send_text(MAV_SEVERITY_CRITICAL, buf);
-//            	    	}
-
-//            	gcs().send_text(MAV_SEVERITY_CRITICAL, "write address #%d: %d", (int)instance, (int)(params[instance].address & 0x7F));
-
-//            	hal.i2c_mgr->get_device(i, 0x29)->write_register(0x8A, params[instance].address & 0x7F);
-//        	    {
-//            	    uint8_t v = 17;
-//            	    hal.i2c_mgr->get_device(i, params[instance].address)->read_registers(0x8A, &v, 1);
-//            	    gcs().send_text(MAV_SEVERITY_CRITICAL, "real address #%d: %d", (int)instance, (int)(v));
-//            	}
-//	    		gcs().send_text(MAV_SEVERITY_CRITICAL, "address #%d: %d", (int)instance, (int)(params[instance].address & 0x7F));
-
-
-            	//maybe 1 not i
-//            	{
-//            		bool b = true;
-//            	    uint8_t v = 62;
-//            		gcs().send_text(MAV_SEVERITY_CRITICAL, "addr: %d", hal.i2c_mgr->get_device(i, 0x30)->get_bus_address());
-//            		gcs().send_text(MAV_SEVERITY_CRITICAL, "num: %d", hal.i2c_mgr->get_device(i, 0x30)->bus_num());
-////            		b = hal.i2c_mgr->get_device(i, 0x29)->write_register(0x8A, 0x30 & 0x7F);
-////                    hal.scheduler->delay(200);
-//            		gcs().send_text(MAV_SEVERITY_CRITICAL, "writeln: %d", (b ? 1 : 0));
-////            	    b = hal.i2c_mgr->get_device(i, 0x30)->read_registers(0x8A, &v, 1);
-////            	    hal.scheduler->delay(200);
-//            	    gcs().send_text(MAV_SEVERITY_CRITICAL, "readln: %d", (b ? 1 : 0));
-//            	    gcs().send_text(MAV_SEVERITY_CRITICAL, "real address #%d: %d", (int)instance, (int)(v));
-//            	}
-//            	gcs().send_text(MAV_SEVERITY_CRITICAL, "address #%d: %d", (int)instance, (int)(params[instance].address & 0x7F));
-
                 if (_add_backend(AP_RangeFinder_VL53L0X::detect(state[instance], params[instance],
                                                                  hal.i2c_mgr->get_device(i, params[instance].address)))) {
-                	gcs().send_text(MAV_SEVERITY_CRITICAL, "leave case");
                     break;
                 }
-            	gcs().send_text(MAV_SEVERITY_CRITICAL, "call if");
-            	gcs().send_text(MAV_SEVERITY_CRITICAL, "leave case");
                 if (_add_backend(AP_RangeFinder_VL53L1X::detect(state[instance], params[instance],
                                                                 hal.i2c_mgr->get_device(i, params[instance].address)))) {
                     break;

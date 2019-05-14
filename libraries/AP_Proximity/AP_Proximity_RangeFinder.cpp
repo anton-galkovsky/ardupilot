@@ -56,86 +56,43 @@ void AP_Proximity_RangeFinder::update(void)
         if (sensor == nullptr) {
             continue;
         }
+
+        float distance_min_m = sensor->min_distance_cm() / 100.0f;
+        float distance_max_m = sensor->max_distance_cm() / 100.0f;
+
         // check for horizontal range finders
         if (sensor->orientation() <= ROTATION_YAW_315) {
             uint8_t sector = (uint8_t)sensor->orientation();
             _angle[sector] = sector * 45;
-            _distance_min = sensor->min_distance_cm() / 100.0f;
-            _distance_max = sensor->max_distance_cm() / 100.0f;
+            _distance_min = distance_min_m;
+            _distance_max = distance_max_m;
 
-            uint32_t sensor_last_reading_ms = sensor->last_reading_ms();
-
-            if (now - sensor_last_reading_ms > 30) {
-            	sensor_last_reading_ms = now;
-            }
-
-            float sensor_data;
-            if (sensor->has_data()) {
-            	sensor_data = sensor->distance_cm() / 100.0f;
-            } else {
-            	sensor_data = _distance_max - 0.01f;
-            }
-
-            _horizontal_distance_bufs[sector].add_value(sensor_data, sensor_last_reading_ms);
-            _distance[sector] = _horizontal_distance_bufs[sector].get_median();
+            _distance[sector] = sensor->get_smooth_buf_dist_cm() / 100.0f;
 
             sprintf(loc, "%d ", (int)(_distance[sector] * 100.0f));
-
 
             _distance_valid[sector] = (_distance[sector] >= _distance_min) && (_distance[sector] <= _distance_max);
             _last_update_ms = now;
             update_boundary_for_sector(sector);
         }
         // check upward facing range finder
-        if (sensor->orientation() == ROTATION_PITCH_90) {
-            int16_t up_distance_min = sensor->min_distance_cm() / 100.0f;
-            int16_t up_distance_max = sensor->max_distance_cm() / 100.0f;
-
-        	uint32_t sensor_last_reading_ms = sensor->last_reading_ms();
-
-        	if (now - sensor_last_reading_ms > 30) {
-        	  	sensor_last_reading_ms = now;
-        	}
-
-        	float sensor_data;
-   	        if (sensor->has_data()) {
-   	           	sensor_data = sensor->distance_cm() / 100.0f;
-   	        } else {
-   	         	sensor_data = up_distance_max - 0.01f;
-   	        }
-
-   	        _upward_distance_buf.add_value(sensor_data, sensor_last_reading_ms);
-   	        _distance_upward = _upward_distance_buf.get_median();
+        else if (sensor->orientation() == ROTATION_PITCH_90) {
+            _distance_upward = sensor->get_smooth_buf_dist_cm() / 100.0f;
 
         	sprintf(loc, "%d ", (int)(_distance_upward * 100.0f));
 
-            if ((_distance_upward < up_distance_min) || (_distance_upward > up_distance_max)) {
+            if ((_distance_upward < distance_min_m) || (_distance_upward > distance_max_m)) {
                 _distance_upward = -1.0; // mark an valid reading
             }
             _last_upward_update_ms = now;
         }
-        if (sensor->orientation() == ROTATION_PITCH_270) {
-            int16_t down_distance_min = sensor->min_distance_cm() / 100.0f;
-            int16_t down_distance_max = sensor->max_distance_cm() / 100.0f;
+        // check downward facing range finder
+        else if (sensor->orientation() == ROTATION_PITCH_270) {
+           	_distance_downward = sensor->get_smooth_buf_dist_cm() / 100.0f;
 
-            uint32_t sensor_last_reading_ms = sensor->last_reading_ms();
-
-            if (now - sensor_last_reading_ms > 30) {
-              	sensor_last_reading_ms = now;
-            }
-
-            float sensor_data;
-           	if (sensor->has_data()) {
-           	   	sensor_data = sensor->distance_cm() / 100.0f;
-           	} else {
-           	  	sensor_data = down_distance_max - 0.01f;
-           	}
-
-           	_downward_distance_buf.add_value(sensor_data, sensor_last_reading_ms);
-           	_distance_downward = _downward_distance_buf.get_median();
            	sprintf(loc, "%d ", (int)(_distance_downward * 100.0f));
 
-            if ((_distance_downward < down_distance_min) || (_distance_downward > down_distance_max)) {
+            if ((_distance_downward < distance_min_m) || (_distance_downward > distance_max_m)) {
                 _distance_downward = -1.0; // mark an valid reading
             }
             _last_downward_update_ms = now;

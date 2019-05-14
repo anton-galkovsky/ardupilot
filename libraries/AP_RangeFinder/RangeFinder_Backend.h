@@ -17,6 +17,8 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_HAL/AP_HAL.h>
 #include "RangeFinder.h"
+#include "Distance_Buffer.h"
+
 
 class AP_RangeFinder_Backend
 {
@@ -36,10 +38,8 @@ public:
     void update_pre_arm_check();
 
     enum Rotation orientation() const { return (Rotation)params.orientation.get(); }
-    uint16_t distance_cm() const {
-    	//params.offset contains sensor's offset (m)
-    	return MAX(state.distance_cm - params.offset * 100, params.min_distance_cm + 1);
-    }
+    uint16_t distance_cm() const { return state.distance_cm; }
+    uint16_t get_smooth_buf_dist_cm() const { return dist_buf.get_dist_cm(); }
     uint16_t voltage_mv() const { return state.voltage_mv; }
     int16_t max_distance_cm() const { return params.max_distance_cm; }
     int16_t min_distance_cm() const { return params.min_distance_cm; }
@@ -47,6 +47,8 @@ public:
     MAV_DISTANCE_SENSOR get_mav_distance_sensor_type() const;
     RangeFinder::RangeFinder_Status status() const;
     RangeFinder::RangeFinder_Type type() const { return (RangeFinder::RangeFinder_Type)params.type.get(); }
+
+    void add_dist_to_buf(uint32_t time) { dist_buf.add_sensor_data(time); }
 
     // true if sensor is returning data
     bool has_data() const;
@@ -62,6 +64,8 @@ public:
     uint32_t last_reading_ms() const { return state.last_reading_ms; }
 
 protected:
+
+    Distance_Buffer dist_buf{this};
 
     // update status based on distance measurement
     void update_status();
