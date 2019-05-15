@@ -14,7 +14,6 @@
  */
 
 #include <AP_Common/AP_Common.h>
-#include <AP_HAL/AP_HAL.h>
 #include "RangeFinder_Backend.h"
 #include "Distance_Buffer.h"
 
@@ -38,19 +37,42 @@ void Distance_Buffer::add_value(uint16_t val, uint32_t sensor_last_reading_ms) {
 	buf[next_ind] = val;
 	next_ind = (next_ind + 1) % DISTANCE_BUFFER_LENGTH;
 
-	memcpy(sorted_buf, buf, DISTANCE_BUFFER_LENGTH * sizeof(uint16_t));
-	qsort(sorted_buf, DISTANCE_BUFFER_LENGTH, sizeof(uint16_t), compare);
+	for (uint8_t i = 0; i < DISTANCE_BUFFER_LENGTH; i++) {
+		sorted_buf[i] = buf[i];
+	}
+	uint16_t x;
+	for (uint8_t i = 0; i < DISTANCE_BUFFER_LENGTH - 1; i++) {
+		if (sorted_buf[i] > sorted_buf[i + 1]) {
+			x = sorted_buf[i];
+			sorted_buf[i] = sorted_buf[i + 1];
+			sorted_buf[i + 1] = x;
+			if (i != 0) {
+				i -= 2;
+			}
+		}
+	}
 
 	penult_value_cm = last_value_cm;
 	last_value_cm = sorted_buf[DISTANCE_BUFFER_LENGTH / 2];
 
-	value_derivative_cmms = (last_value_cm - penult_value_cm)
+	value_derivative_cmms = 1.0f * (last_value_cm - penult_value_cm)
 			/ (last_measure_time_ms - penult_measure_time_ms);
+}
+
+void Distance_Buffer::send_data_to_gcs() const {
+	char str[15 + DISTANCE_BUFFER_LENGTH * 4];
+	char loc[5];
+	strcpy(str, "dist_buf: ");
+	for (uint8_t i = 0; i < DISTANCE_BUFFER_LENGTH; i++) {
+		sprintf(loc, "%03d ", sorted_buf[i]);
+		strcat(str, loc);
+	}
+	gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 }
 
 void Distance_Buffer::add_sensor_data(uint32_t time) {
 	uint32_t sensor_last_reading_ms = sensor->last_reading_ms();
-	if (time - sensor_last_reading_ms > 30) {
+	if (time - sensor_last_reading_ms > 100) {
 	    sensor_last_reading_ms = time;
 	}
 	if (last_measure_time_ms == sensor_last_reading_ms) {

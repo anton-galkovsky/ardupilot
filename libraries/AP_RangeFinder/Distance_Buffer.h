@@ -16,7 +16,7 @@
 
 #include "RangeFinder.h"
 
-#define DISTANCE_BUFFER_LENGTH 4
+#define DISTANCE_BUFFER_LENGTH 5
 
 class Distance_Buffer {
 
@@ -29,10 +29,10 @@ class Distance_Buffer {
 	uint16_t buf[DISTANCE_BUFFER_LENGTH] {};
 	uint16_t sorted_buf[DISTANCE_BUFFER_LENGTH] {};
 	uint8_t next_ind;
-	uint32_t last_measure_time_ms;
-	uint32_t penult_measure_time_ms;
 	uint16_t last_value_cm;
 	uint16_t penult_value_cm;
+	uint32_t last_measure_time_ms;
+	uint32_t penult_measure_time_ms;
 	float value_derivative_cmms;
 
 	void add_value(uint16_t val, uint32_t sensor_last_reading_ms);
@@ -43,10 +43,12 @@ public:
 
 	void add_sensor_data(uint32_t time);
 
+	void send_data_to_gcs() const;
+
 	//return median
 	uint16_t get_dist_cm() const { return last_value_cm; }
 
-	uint16_t get_derivative_cmms() const { return value_derivative_cmms;	}
+	float get_derivative_cmms() const { return value_derivative_cmms; }
 
 	uint32_t get_last_measure_time_ms() const { return last_measure_time_ms; }
 };

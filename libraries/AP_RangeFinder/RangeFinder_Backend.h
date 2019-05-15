@@ -40,6 +40,7 @@ public:
     enum Rotation orientation() const { return (Rotation)params.orientation.get(); }
     uint16_t distance_cm() const { return state.distance_cm; }
     uint16_t get_smooth_buf_dist_cm() const { return dist_buf.get_dist_cm(); }
+    float get_dist_derivative_cmms() const { return dist_buf.get_derivative_cmms(); }
     uint16_t voltage_mv() const { return state.voltage_mv; }
     int16_t max_distance_cm() const { return params.max_distance_cm; }
     int16_t min_distance_cm() const { return params.min_distance_cm; }
@@ -49,6 +50,7 @@ public:
     RangeFinder::RangeFinder_Type type() const { return (RangeFinder::RangeFinder_Type)params.type.get(); }
 
     void add_dist_to_buf(uint32_t time) { dist_buf.add_sensor_data(time); }
+	void send_dist_buf_data_to_gcs() const { dist_buf.send_data_to_gcs(); }
 
     // true if sensor is returning data
     bool has_data() const;
