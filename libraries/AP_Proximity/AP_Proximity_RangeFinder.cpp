@@ -125,7 +125,6 @@ void AP_Proximity_RangeFinder::update(void)
 // get distance upwards in meters. returns true on success
 bool AP_Proximity_RangeFinder::get_upward_distance(float &distance) const
 {
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, "%d %d", (int)(_distance_downward * 100.0f), (int)(_distance_upward * 100.0f));
     if ((AP_HAL::millis() - _last_upward_update_ms <= PROXIMITY_RANGEFIDER_TIMEOUT_MS) &&
         is_positive(_distance_upward)) {
         distance = _distance_upward;

@@ -403,6 +403,7 @@ void AC_Avoid::adjust_throttle(float &throttle_scaled)
 
     float down_dist = 0.0f;
     float down_dist_der = 0.0f;
+    float up_dist = 0.0f;
 
     float result_throttle = 0.0f;
 
@@ -413,7 +414,12 @@ void AC_Avoid::adjust_throttle(float &throttle_scaled)
 		is_alt_hold = true;
 		if (_proximity.get_downward_distance(down_dist)
 				&& _proximity.get_downward_dist_der(down_dist_der)) {
-			float error = _ver_pid_h - down_dist;
+
+			_proximity.get_upward_distance(up_dist);
+			float up_err = MIN(up_dist - _ver_pid_h, 0.0f);
+			float down_err = _ver_pid_h - down_dist;
+			float error = down_err + up_err;
+
 //			float pid_ip;
 //			if (error > 0.0f) {
 //				pid_ip = error * THROTTLE_PID_IP_POS;
@@ -765,7 +771,9 @@ float AC_Avoid::distance_to_lean_pct(float dist_m)
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_max:%f, dist_m:%f", (double)_dist_max, (double)dist_m);
 
     // inverted but linear response
-    return 1.0f - (dist_m / _dist_max);
+//    return 1.0f - (dist_m / _dist_max);
+
+    return powf(1.0f - (dist_m / _dist_max), 0.75f);
 }
 
 void AC_Avoid::get_proximity_distance_der(float &pitch_dist_der, float &roll_dist_der) {
