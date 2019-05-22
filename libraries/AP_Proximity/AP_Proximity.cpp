@@ -395,6 +395,17 @@ uint8_t AP_Proximity::get_object_count() const
 
 // get an object's angle and distance, used for non-GPS avoidance
 // returns false if no angle or distance could be returned for some reason
+bool AP_Proximity::get_object_angle_and_dist_der(uint8_t object_number, float& angle_deg, float &dist_der) const
+{
+    if ((drivers[primary_instance] == nullptr) || (_type[primary_instance] == Proximity_Type_None)) {
+        return false;
+    }
+    // get angle and distance from backend
+    return drivers[primary_instance]->get_object_angle_and_dist_der(object_number, angle_deg, dist_der);
+}
+
+// get an object's angle and distance, used for non-GPS avoidance
+// returns false if no angle or distance could be returned for some reason
 bool AP_Proximity::get_object_angle_and_distance(uint8_t object_number, float& angle_deg, float &distance) const
 {
     if ((drivers[primary_instance] == nullptr) || (_type[primary_instance] == Proximity_Type_None)) {
@@ -435,6 +446,32 @@ bool AP_Proximity::get_upward_distance(uint8_t instance, float &distance) const
 bool AP_Proximity::get_upward_distance(float &distance) const
 {
     return get_upward_distance(primary_instance, distance);
+}
+
+bool AP_Proximity::get_downward_distance(uint8_t instance, float &distance) const
+{
+    if ((drivers[instance] == nullptr) || (_type[instance] == Proximity_Type_None)) {
+        return false;
+    }
+    return drivers[instance]->get_downward_distance(distance);
+}
+
+bool AP_Proximity::get_downward_distance(float &distance) const
+{
+    return get_downward_distance(primary_instance, distance);
+}
+
+bool AP_Proximity::get_downward_dist_der(uint8_t instance, float &dist_der) const
+{
+    if ((drivers[instance] == nullptr) || (_type[instance] == Proximity_Type_None)) {
+        return false;
+    }
+    return drivers[instance]->get_downward_dist_der(dist_der);
+}
+
+bool AP_Proximity::get_downward_dist_der(float &dist_der) const
+{
+    return get_downward_dist_der(primary_instance, dist_der);
 }
 
 AP_Proximity::Proximity_Type AP_Proximity::get_type(uint8_t instance) const

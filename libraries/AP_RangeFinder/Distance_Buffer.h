@@ -16,7 +16,7 @@
 
 #include "RangeFinder.h"
 
-#define DISTANCE_BUFFER_LENGTH 5
+#define DISTANCE_BUFFER_LENGTH 4
 
 class Distance_Buffer {
 

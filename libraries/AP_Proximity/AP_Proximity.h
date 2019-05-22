@@ -105,6 +105,7 @@ public:
 
     // get number of objects, angle and distance - used for non-GPS avoidance
     uint8_t get_object_count() const;
+    bool get_object_angle_and_dist_der(uint8_t object_number, float& angle_deg, float &dist_der) const;
     bool get_object_angle_and_distance(uint8_t object_number, float& angle_deg, float &distance) const;
 
     // get maximum and minimum distances (in meters) of primary sensor
@@ -127,6 +128,12 @@ public:
     // get distance upwards in meters. returns true on success
     bool get_upward_distance(uint8_t instance, float &distance) const;
     bool get_upward_distance(float &distance) const;
+
+    bool get_downward_distance(uint8_t instance, float &distance) const;
+    bool get_downward_distance(float &distance) const;
+
+    bool get_downward_dist_der(uint8_t instance, float &dist_der) const;
+    bool get_downward_dist_der(float &dist_der) const;
 
     Proximity_Type get_type(uint8_t instance) const;
 

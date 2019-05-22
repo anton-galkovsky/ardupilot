@@ -41,6 +41,8 @@ public:
 
     // get distance upwards in meters. returns true on success
     virtual bool get_upward_distance(float &distance) const { return false; }
+    virtual bool get_downward_distance(float &distance) const { return false; }
+    virtual bool get_downward_dist_der(float &dist_der) const { return false; }
 
     // handle mavlink DISTANCE_SENSOR messages
     virtual void handle_msg(mavlink_message_t *msg) {}
@@ -59,6 +61,8 @@ public:
 
     // get number of objects, angle and distance - used for non-GPS avoidance
     uint8_t get_object_count() const;
+
+    bool get_object_angle_and_dist_der(uint8_t object_number, float& angle_deg, float &dist_der) const;
     bool get_object_angle_and_distance(uint8_t object_number, float& angle_deg, float &distance) const;
 
     // get distances in 8 directions. used for sending distances to ground station
@@ -98,6 +102,7 @@ protected:
     float _angle[PROXIMITY_SECTORS_MAX];            // angle to closest object within each sector
     float _distance[PROXIMITY_SECTORS_MAX];         // distance to closest object within each sector
     bool _distance_valid[PROXIMITY_SECTORS_MAX];    // true if a valid distance received for each sector
+    float _dist_derivative[PROXIMITY_SECTORS_MAX];
 
     // fence boundary
     Vector2f _sector_edge_vector[PROXIMITY_SECTORS_MAX];    // vector for right-edge of each sector, used to speed up calculation of boundary

@@ -73,6 +73,16 @@ uint8_t AP_Proximity_Backend::get_object_count() const
     return _num_sectors;
 }
 
+bool AP_Proximity_Backend::get_object_angle_and_dist_der(uint8_t object_number, float& angle_deg, float &dist_der) const
+{
+    if (object_number < _num_sectors && _distance_valid[object_number]) {
+        angle_deg = _angle[object_number];
+        dist_der = _dist_derivative[object_number];
+        return true;
+    }
+    return false;
+}
+
 // get an object's angle and distance, used for non-GPS avoidance
 // returns false if no angle or distance could be returned for some reason
 bool AP_Proximity_Backend::get_object_angle_and_distance(uint8_t object_number, float& angle_deg, float &distance) const

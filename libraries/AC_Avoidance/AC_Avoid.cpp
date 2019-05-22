@@ -206,7 +206,7 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     }
 }
 
-#define ALPHA 0.9 //0.995
+#define ALPHA 0 //0.995
 
 // adjust roll-pitch to push vehicle away from objects
 // roll and pitch value are in centi-degrees
@@ -232,36 +232,55 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     // get maximum positive and negative roll and pitch percentages from proximity sensor
     get_proximity_roll_pitch_pct(roll_positive, roll_negative, pitch_positive, pitch_negative);
 
+    float roll_dist_der = 0.0f;
+    float pitch_dist_der = 0.0f;
+
+    get_proximity_distance_der(pitch_dist_der, roll_dist_der);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.4f  %4.4f", (double)pitch_dist_der, (double)roll_dist_der);
+
     // add maximum positive and negative percentages together for roll and pitch, convert to centi-degrees
 //    Vector2f rp_out((roll_positive + roll_negative) * 4500.0f, (pitch_positive + pitch_negative) * 4500.0f);
 
-    float rp_out_roll = (roll_positive + roll_negative) * 2500.0f;
-    float rp_out_pitch = (pitch_positive + pitch_negative) * 2500.0f;
-    uint32_t time = AP_HAL::millis();
+    float rp_out_roll = (roll_positive + roll_negative) * 5000.0f;
+    float rp_out_pitch = (pitch_positive + pitch_negative) * 5000.0f;
+//    uint32_t time = AP_HAL::millis();
 
-    static float rp_out_roll_old = rp_out_roll;
-    static float rp_out_pitch_old = rp_out_pitch;
-    static uint32_t time_old = 0;
+//    static float rp_out_roll_old = rp_out_roll;
+//    static float rp_out_pitch_old = rp_out_pitch;
+//    static uint32_t time_old = 0;
+//
+//
+//    float alpha = 1.0f;
+//    if (time - time_old > 500) {
+//    	alpha = 0;
+//    } else {
+//    	for (uint32_t i = 0; i < time - time_old; i++) {
+//    		alpha *= ALPHA;
+//    	}
+//    }
+//    float rp_out_x = alpha * rp_out_roll_old + (1 - alpha) * rp_out_roll;
+//    float rp_out_y = alpha * rp_out_pitch_old + (1 - alpha) * rp_out_pitch;
 
+//	Vector3f gyro((AP::ahrs()).get_gyro());
 
-    float alpha = 1.0f;
-    if (time - time_old > 500) {
-    	alpha = 0;
-    } else {
-    	for (uint32_t i = 0; i < time - time_old; i++) {
-    		alpha *= ALPHA;
-    	}
-    }
-    float rp_out_x = alpha * rp_out_roll_old + (1 - alpha) * rp_out_roll;
-    float rp_out_y = alpha * rp_out_pitch_old + (1 - alpha) * rp_out_pitch;
+	float rp_out_x = rp_out_roll - roll_dist_der * 500.0f;
+	float rp_out_y = rp_out_pitch - pitch_dist_der * 500.0f;
+//    if (rp_out_x * rp_out_roll <= 0.0f) {
+//    	rp_out_x = 0;
+//    }
+//    if (rp_out_y * rp_out_pitch <= 0.0f) {
+//        rp_out_y = 0;
+//    }
+//    rp_out_x -= gyro.x * 2000;
+//    rp_out_y -= gyro.y * 2000;
     Vector2f rp_out(rp_out_x, rp_out_y);
 
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.1f,%4.1f,%4.1f,%4.1f,%d",
 //    		(double)rp_out_roll, (double)rp_out_pitch, (double)rp_out_x, (double)rp_out_y, time - time_old);
 
-    rp_out_roll_old = rp_out_x;
-    rp_out_pitch_old = rp_out_y;
-    time_old = time;
+//    rp_out_roll_old = rp_out_x;
+//    rp_out_pitch_old = rp_out_y;
+//    time_old = time;
 
 
 //    	float rp_out_roll_der = 4 * (rp_out_roll - rp_out_roll_old) / MAX(time - time_old, (uint32_t)1);
@@ -281,12 +300,14 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
 //    time_old = time;
 
 
-    //    gcs().send_text(MAV_SEVERITY_CRITICAL, "x: %f, y: %f, ag: %f", (double)rp_out.x, (double)rp_out.y, (double)veh_angle_max);
 
 
     // apply avoidance angular limits
     // the object avoidance lean angle is never more than 75% of the total angle-limit to allow the pilot to override
     const float angle_limit = constrain_float(_angle_max, 0.0f, veh_angle_max * AC_AVOID_ANGLE_MAX_PERCENT);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "x: %f, y: %f, al: %f", (double)rp_out.x, (double)rp_out.y, (double)angle_limit);
+
     float vec_len = rp_out.length();
     if (vec_len > angle_limit) {
         rp_out *= (angle_limit / vec_len);
@@ -306,6 +327,88 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     // return adjusted roll, pitch
     roll = rp_out.x;
     pitch = rp_out.y;
+}
+
+#define THROTTLE_PID_I 0.00004f
+#define THROTTLE_PID_IP_POS 0.00015f
+#define THROTTLE_PID_IP_NEG 0.00005f
+#define THROTTLE_PID_ID 0.0000f   //0.0001f
+
+#define THROTTLE_PID_DP 0.000003f   //0.0002f
+
+void AC_Avoid::adjust_throttle(float &throttle_scaled)
+{
+    // exit immediately if proximity based avoidance is disabled
+    if ((_enabled & AC_AVOID_USE_PROXIMITY_SENSOR) == 0 || !_proximity_enabled) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "!(_enabled & AC_AVOID_USE_PROXIMITY_SENSOR) == 0 || !_proximity_enabled)");
+        return;
+    }
+
+    static float alt_hold_throttle = 0.5;
+    static bool go_to_pilot_throttle = false;
+    static bool is_alt_hold = false;
+
+    float down_dist = 0.0f;
+    float down_dist_der = 0.0f;
+
+    float result_throttle = 0.0f;
+
+	if (rc().get_radio_in(5) > 1500) {
+		if (!is_alt_hold) {
+			alt_hold_throttle = throttle_scaled;
+		}
+		is_alt_hold = true;
+		if (_proximity.get_downward_distance(down_dist)
+				&& _proximity.get_downward_dist_der(down_dist_der)) {
+			float error = 0.7f - down_dist;
+//			float pid_ip;
+//			if (error > 0.0f) {
+//				pid_ip = error * THROTTLE_PID_IP_POS;
+//			} else {
+//				pid_ip = error * THROTTLE_PID_IP_NEG;
+//			}
+//		    float pid_id = down_dist_der * THROTTLE_PID_ID;
+
+//	    	if (pid_ip < -THROTTLE_PID_I) {
+//	    		pid_ip = -THROTTLE_PID_I;
+//	    	}
+//			if (pid_ip > THROTTLE_PID_I) {
+//				pid_ip = THROTTLE_PID_I;
+//			}
+//	    	alt_hold_throttle = alt_hold_throttle + pid_ip - pid_id;
+
+			float target_pid_dp = error * 0.1f;                         // when error = 0.1 m = 10 cm, target_vel = error * 0.1 = 1 cm/s
+			float pid_dp = (target_pid_dp - down_dist_der) * THROTTLE_PID_DP;
+			alt_hold_throttle = alt_hold_throttle + pid_dp;
+	    }
+	    alt_hold_throttle = MAX(alt_hold_throttle, 0.0f);
+	    alt_hold_throttle = MIN(alt_hold_throttle, 1.0f);
+	    result_throttle = alt_hold_throttle;
+    } else {
+    	if (is_alt_hold) {
+    		go_to_pilot_throttle = true;
+    	}
+    	is_alt_hold = false;
+    	if (go_to_pilot_throttle) {
+    		if ((float)fabs(alt_hold_throttle - throttle_scaled) < 0.01f) {
+    			go_to_pilot_throttle = false;
+    			result_throttle = throttle_scaled;
+    		} else {
+    			if (alt_hold_throttle > throttle_scaled) {
+    				alt_hold_throttle -= THROTTLE_PID_I;
+    			} else {
+    	    		alt_hold_throttle += THROTTLE_PID_I;
+    	    	}
+    		    alt_hold_throttle = MAX(alt_hold_throttle, 0.0f);
+    		    alt_hold_throttle = MIN(alt_hold_throttle, 1.0f);
+    			result_throttle = alt_hold_throttle;
+    		}
+    	} else {
+    		result_throttle = throttle_scaled;
+    	}
+    }
+	throttle_scaled = result_throttle;
+//	gcs().send_text(MAV_SEVERITY_CRITICAL, "down: %06.3f, %06.3f", (double)down_dist, (double)throttle_scaled);
 }
 
 /*
@@ -612,6 +715,34 @@ float AC_Avoid::distance_to_lean_pct(float dist_m)
     return 1.0f - (dist_m / _dist_max);
 }
 
+void AC_Avoid::get_proximity_distance_der(float &pitch_dist_der, float &roll_dist_der) {
+	// exit immediately if proximity sensor is not present
+	if (_proximity.get_status() != AP_Proximity::Proximity_Good) {
+		gcs().send_text(MAV_SEVERITY_CRITICAL,
+				"! AP_Proximity::Proximity_Good");
+		return;
+	}
+
+	const uint8_t obj_count = _proximity.get_object_count();
+
+	// if no objects return
+	if (obj_count == 0) {
+		gcs().send_text(MAV_SEVERITY_CRITICAL, "obj_count == 0");
+		return;
+	}
+
+	// calculate maximum roll, pitch values from objects
+	for (uint8_t i = 0; i < obj_count; i++) {
+		float ang_deg, dist_m;
+		if (_proximity.get_object_angle_and_dist_der(i, ang_deg, dist_m)) {
+			// convert angle to roll and pitch lean percentages
+			const float angle_rad = radians(ang_deg);
+			roll_dist_der += -(float)sinf(angle_rad) * dist_m;
+			pitch_dist_der += (float)cosf(angle_rad) * dist_m;
+		}
+	}
+}
+
 // returns the maximum positive and negative roll and pitch percentages (in -1 ~ +1 range) based on the proximity sensor
 void AC_Avoid::get_proximity_roll_pitch_pct(float &roll_positive, float &roll_negative, float &pitch_positive, float &pitch_negative)
 {
@@ -665,12 +796,6 @@ void AC_Avoid::get_proximity_roll_pitch_pct(float &roll_positive, float &roll_ne
             }
         }
     }
-
-//    if (b) {
-//    	gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_m[] >= _dist_max");
-//    }
-//
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, "rlp:%f,rln:%f,pcp:%f,pcn:%f", roll_positive, roll_negative, pitch_positive, pitch_negative);
 }
 
 // singleton instance

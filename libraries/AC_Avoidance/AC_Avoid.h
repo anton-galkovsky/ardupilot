@@ -20,7 +20,7 @@
 
 // definitions for non-GPS avoidance
 #define AC_AVOID_NONGPS_DIST_MAX_DEFAULT    5.0f    // objects over 5m away are ignored (default value for DIST_MAX parameter)
-#define AC_AVOID_ANGLE_MAX_PERCENT          0.75f   // object avoidance max lean angle as a percentage (expressed in 0 ~ 1 range) of total vehicle max lean angle
+#define AC_AVOID_ANGLE_MAX_PERCENT          0.88f   // object avoidance max lean angle as a percentage (expressed in 0 ~ 1 range) of total vehicle max lean angle
 
 /*
  * This class prevents the vehicle from leaving a polygon fence in
@@ -62,6 +62,7 @@ public:
     // roll and pitch value are in centi-degrees
     // angle_max is the user defined maximum lean angle for the vehicle in centi-degrees
     void adjust_roll_pitch(float &roll, float &pitch, float angle_max);
+    void adjust_throttle(float &throttle_scaled);
 
     // enable/disable proximity based avoidance
     void proximity_avoidance_enable(bool on_off) { _proximity_enabled = on_off; }
@@ -128,6 +129,7 @@ private:
     // convert distance (in meters) to a lean percentage (in 0~1 range) for use in manual flight modes
     float distance_to_lean_pct(float dist_m);
 
+    void get_proximity_distance_der(float &roll_dist_der, float &pitch_dist_der);
     // returns the maximum positive and negative roll and pitch percentages (in -1 ~ +1 range) based on the proximity sensor
     void get_proximity_roll_pitch_pct(float &roll_positive, float &roll_negative, float &pitch_positive, float &pitch_negative);
 

@@ -392,17 +392,17 @@ void RangeFinder::update(void)
 				uint8_t sector = (uint8_t) drivers[i]->orientation();
 				if ((sector == ROTATION_NONE && ahrs.pitch < 0.0f)
 						|| (sector == ROTATION_YAW_180 && ahrs.pitch > 0.0f)) {
-					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)) - downward_dist) < 4.0f) {
+					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)) - downward_dist) < 4.8f) {
 //						pitch_points_floor = true;
 //						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f %3.1f %010d",
 //								(double)state[i].distance_cm * fabs(sinf(ahrs.pitch)), (double)downward_dist, AP_HAL::millis());
-						state[i].distance_cm = 0;
+						state[i].distance_cm = 0; // = 0
 					}
 				} else if ((sector == ROTATION_YAW_90 && ahrs.roll > 0.0f)
 						|| (sector == ROTATION_YAW_270 && ahrs.roll < 0.0f)) {
-					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.roll)) - downward_dist) < 4.0f) {
+					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.roll)) - downward_dist) < 4.8f) {
 //						roll_points_floor = true;
-						state[i].distance_cm = 0;
+						state[i].distance_cm = 0; // = 0
 					}
 				}
 			}
@@ -415,7 +415,7 @@ void RangeFinder::update(void)
 //			if (((sector == ROTATION_NONE || sector == ROTATION_YAW_180) && pitch_points_floor)
 //					|| ((sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) && roll_points_floor)) {
 			if (state[i].distance_cm == 0) {
-				state[i].distance_cm = params[i].max_distance_cm - 1;
+				state[i].distance_cm = params[i].max_distance_cm - 1; // params[i].max_distance_cm - 1;
 			} else {
 				float offset, pos = 0.0f, coef = 1.0f;
 				offset = params[i].offset * 100.0f;
@@ -457,46 +457,27 @@ void RangeFinder::update(void)
 	}
 
 
+//	{
+//		Vector3f gyro(ahrs.get_gyro());
+//	    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.4f, %4.4f, %4.4f",
+//	    		(double)gyro.x, (double)gyro.y, (double)gyro.z);
+//
+//	}
+
 	{
 		char str[50];     //log for 6 instanses
 		char loc[5];
 		strcpy(str, "dist: ");
 
-//		sprintf(loc, "%03d ", drivers[3]->get_smooth_buf_dist_cm());
-//		strcat(str, loc);
-//		sprintf(loc, "%03d ", drivers[3]->distance_cm());
-//		strcat(str, loc);
-
-		Vector3f local_position, velocity;
-		ahrs.get_velocity_NED(velocity);
-
-		sprintf(loc, "%5.3f ", (double)velocity.x);
+		for (int i = 0; i < num_instances; i++) {
+			sprintf(loc, "%03d ", drivers[i]->get_smooth_buf_dist_cm());
+//		sprintf(loc, "%03d ", drivers[i]->distance_cm());
+			strcat(str, loc);
+		}
+		sprintf(loc, "%d", now);
 		strcat(str, loc);
-		sprintf(loc, "%5.3f ", (double)velocity.y);
-		strcat(str, loc);
-		sprintf(loc, "%5.3f ", (double)velocity.z);
-		strcat(str, loc);
-
-//		sprintf(loc, "%d", now);
-//		strcat(str, loc);
 		gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 	}
-
-//	{
-//		for (int i = 0; i < num_instances; i++) {
-//			sprintf(loc, "%03d ", drivers[i]->get_smooth_buf_dist_cm());
-////		sprintf(loc, "%03d ", drivers[i]->distance_cm());
-////       	if (drivers[i]->has_data()) {
-////       		sprintf(loc, "%03d ", drivers[i]->distance_cm());
-////       	} else {
-////       		sprintf(loc, "--- ");
-////       	}
-//			strcat(str, loc);
-//		}
-//		sprintf(loc, "%d", now);
-//		strcat(str, loc);
-//		gcs().send_text(MAV_SEVERITY_CRITICAL, str);
-//	}
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)

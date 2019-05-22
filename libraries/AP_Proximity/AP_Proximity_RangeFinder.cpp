@@ -45,7 +45,7 @@ void AP_Proximity_RangeFinder::update(void)
 
     uint32_t now = AP_HAL::millis();
 
-    char str[50];     //for 6 instanses
+    char str[60];     //for 6 instanses
     char loc[10];
     strcpy(str, "prox: ");
 
@@ -62,18 +62,22 @@ void AP_Proximity_RangeFinder::update(void)
         float distance = sensor->get_smooth_buf_dist_cm() / 100.0f;
 //        float distance = sensor->distance_cm() / 100.0f;
 
-        sprintf(loc, "%2.2f ", (double)(sensor->get_dist_derivative_cmms()));
+//        sprintf(loc, "%2.2f ", (double)(sensor->get_dist_derivative_cmms()));
 
         // check for horizontal range finders
         if (sensor->orientation() <= ROTATION_YAW_315) {
             uint8_t sector = (uint8_t)sensor->orientation();
+
+
             _angle[sector] = sector * 45;
             _distance_min = distance_min_m;
             _distance_max = distance_max_m;
 
             _distance[sector] = distance;
 
-//            sprintf(loc, "%d ", (int)(_distance[sector] * 100.0f));
+            _dist_derivative[sector] = sensor->get_dist_derivative_cmms() * 10.0f;
+
+           	sprintf(loc, "%02.4f ", _dist_derivative[sector]);
 
             _distance_valid[sector] = (_distance[sector] >= _distance_min) && (_distance[sector] <= _distance_max);
             _last_update_ms = now;
@@ -93,8 +97,9 @@ void AP_Proximity_RangeFinder::update(void)
         // check downward facing range finder
         else if (sensor->orientation() == ROTATION_PITCH_270) {
            	_distance_downward = distance;
+           	_distance_downward_der = sensor->get_dist_derivative_cmms() * 10.0f;
 
-//           	sprintf(loc, "%d ", (int)(_distance_downward * 100.0f));
+           	sprintf(loc, "%02.4f ", _distance_downward_der);
 
             if ((_distance_downward < distance_min_m) || (_distance_downward > distance_max_m)) {
                 _distance_downward = -1.0; // mark an valid reading
@@ -104,6 +109,9 @@ void AP_Proximity_RangeFinder::update(void)
        	strcat(str, loc);
     }
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, "prox: %4d",
+//			rc().get_radio_in(5));
 
     // check for timeout and set health status
     if ((_last_update_ms == 0) || (now - _last_update_ms > PROXIMITY_RANGEFIDER_TIMEOUT_MS)) {
@@ -126,18 +134,22 @@ bool AP_Proximity_RangeFinder::get_upward_distance(float &distance) const
     return false;
 }
 
-//// get distance upwards in meters. returns true on success
-//bool AP_Proximity_RangeFinder::get_upward_distance(float &distance) const
-//{
-//    uint32_t now = AP_HAL::millis();
-//
-//    if ((now - _last_upward_update_ms <= PROXIMITY_RANGEFIDER_TIMEOUT_MS) &&
-//    	(now - _last_downward_update_ms <= PROXIMITY_RANGEFIDER_TIMEOUT_MS) &&
-//        is_positive(_distance_upward) && is_positive(_distance_downward)) {
-//
-////    	distance = MAX(0.5 - _distance_downward, 0) - MAX(1.0 - _distance_upward, 0);
-//    	distance = _distance_upward - _distance_downward;
-//        return true;
-//    }
-//    return false;
-//}
+bool AP_Proximity_RangeFinder::get_downward_distance(float &distance) const
+{
+   if ((AP_HAL::millis() - _last_downward_update_ms <= PROXIMITY_RANGEFIDER_TIMEOUT_MS) &&
+        is_positive(_distance_downward)) {
+        distance = _distance_downward;
+        return true;
+    }
+    return false;
+}
+
+bool AP_Proximity_RangeFinder::get_downward_dist_der(float &dist_der) const
+{
+   if ((AP_HAL::millis() - _last_downward_update_ms <= PROXIMITY_RANGEFIDER_TIMEOUT_MS) &&
+        is_positive(_distance_downward)) {
+        dist_der = _distance_downward_der;
+        return true;
+    }
+    return false;
+}

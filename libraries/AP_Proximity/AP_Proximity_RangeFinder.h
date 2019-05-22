@@ -24,6 +24,8 @@ public:
 
     // get distance upwards in meters. returns true on success
     bool get_upward_distance(float &distance) const override;
+    bool get_downward_distance(float &distance) const override;
+    bool get_downward_dist_der(float &dist_der) const override;
 
 private:
 
@@ -38,4 +40,5 @@ private:
 
     uint32_t _last_downward_update_ms;
     float _distance_downward;
+    float _distance_downward_der;
 };
