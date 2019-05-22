@@ -43,6 +43,7 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <GCS_MAVLink/GCS.h>
 #include <stdio.h>
+#include <../ArduCopter/Copter.h>
 
 extern const AP_HAL::HAL &hal;
 
@@ -464,20 +465,24 @@ void RangeFinder::update(void)
 //
 //	}
 
-	{
-		char str[50];     //log for 6 instanses
-		char loc[5];
-		strcpy(str, "dist: ");
-
-		for (int i = 0; i < num_instances; i++) {
-			sprintf(loc, "%03d ", drivers[i]->get_smooth_buf_dist_cm());
-//		sprintf(loc, "%03d ", drivers[i]->distance_cm());
-			strcat(str, loc);
-		}
-		sprintf(loc, "%d", now);
-		strcat(str, loc);
-		gcs().send_text(MAV_SEVERITY_CRITICAL, str);
-	}
+//	{
+//		char str[50];     //log for 6 instanses
+//		char loc[5];
+//		strcpy(str, "dist: ");
+//
+//		for (int i = 0; i < num_instances; i++) {
+//			sprintf(loc, "%03d ", drivers[i]->get_smooth_buf_dist_cm());
+////		sprintf(loc, "%03d ", drivers[i]->distance_cm());
+//			strcat(str, loc);
+//		}
+//		sprintf(loc, "%d", now);
+//		strcat(str, loc);
+//		gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+//
+//
+//
+//	}
+	AC_Avoid::get_singleton()->print_log();
 }
 
 bool RangeFinder::_add_backend(AP_RangeFinder_Backend *backend)

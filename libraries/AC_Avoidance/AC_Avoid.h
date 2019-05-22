@@ -22,6 +22,13 @@
 #define AC_AVOID_NONGPS_DIST_MAX_DEFAULT    5.0f    // objects over 5m away are ignored (default value for DIST_MAX parameter)
 #define AC_AVOID_ANGLE_MAX_PERCENT          0.88f   // object avoidance max lean angle as a percentage (expressed in 0 ~ 1 range) of total vehicle max lean angle
 
+#define AC_AVOID_HOR_PID_P_DEFAULT          4000.0f
+#define AC_AVOID_HOR_PID_D_DEFAULT          500.0f
+#define AC_AVOID_VER_PID_P_DEFAULT          0.1f
+#define AC_AVOID_VER_PID_D_DEFAULT          0.0002f
+#define AC_AVOID_VER_PID_H_DEFAULT          0.7f
+#define AC_AVOID_VER_CHAN_DEFAULT           5
+
 /*
  * This class prevents the vehicle from leaving a polygon fence in
  * 2 dimensions by limiting velocity (adjust_velocity).
@@ -80,6 +87,14 @@ public:
      // be exactly the input distance.
      // kP should be non-zero for Copter which has a non-linear response
     float get_max_speed(float kP, float accel_cmss, float distance_cm, float dt) const;
+
+
+
+
+    void print_log();
+
+
+
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -145,6 +160,12 @@ private:
     AP_Float _dist_max;         // distance (in meters) from object at which obstacle avoidance will begin in non-GPS modes
     AP_Float _margin;           // vehicle will attempt to stay this distance (in meters) from objects while in GPS modes
     AP_Int8 _behavior;          // avoidance behaviour (slide or stop)
+    AP_Float _hor_pid_p;        // Maximum angle for P-component in horizontal PID (via RNGFND) witch would turn out if there was not ANGLE_MAX limit
+    AP_Float _hor_pid_d;        // D-component in horizontal PID (via RNGFND)
+    AP_Float _ver_pid_p;        // Target climbing velocity in vertical PID (via RNGFND)
+    AP_Float _ver_pid_d;        // D-component in vertical PID (via RNGFND)
+    AP_Float _ver_pid_h;        // Target altitude in vertical PID (via RNGFND)
+    AP_Int8 _ver_chan;          // Target altitude in vertical PID to avoid obstacles (via rangefinder)
 
     bool _proximity_enabled = true; // true if proximity sensor based avoidance is enabled (used to allow pilot to enable/disable)
 

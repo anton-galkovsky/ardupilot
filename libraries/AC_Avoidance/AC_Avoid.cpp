@@ -51,6 +51,53 @@ const AP_Param::GroupInfo AC_Avoid::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("BEHAVE", 5, AC_Avoid, _behavior, AP_AVOID_BEHAVE_DEFAULT),
 
+	// @Param: HOR_PID_P
+	// @DisplayName: Maximum angle for P-component in horizontal PID
+	// @Description: Maximum angle for P-component in horizontal PID (via RNGFND) witch would turn out if there was not ANGLE_MAX limit
+	// @Units: cdeg
+	// @Range: 0 6000
+	// @User: Advanced
+	AP_GROUPINFO("HOR_PID_P", 6, AC_Avoid, _hor_pid_p, AC_AVOID_HOR_PID_P_DEFAULT),
+
+	// @Param: HOR_PID_D
+	// @DisplayName: D-component in horizontal PID
+	// @Description: D-component in horizontal PID (via RNGFND)
+	// @Units: cdeg/s
+	// @Range: 0 2000
+	// @User: Advanced
+	AP_GROUPINFO("HOR_PID_D", 7, AC_Avoid, _hor_pid_d, AC_AVOID_HOR_PID_D_DEFAULT),
+
+	// @Param: VER_PID_P
+	// @DisplayName: Target climbing velocity
+	// @Description: Target climbing velocity in vertical PID (via RNGFND)
+	// @Units: m/s
+	// @Range: 0 1
+	// @User: Advanced
+	AP_GROUPINFO("VER_PID_P", 8, AC_Avoid, _ver_pid_p, AC_AVOID_VER_PID_P_DEFAULT),
+
+	// @Param: VER_PID_D
+	// @DisplayName: D-component in vertical PID
+	// @Description: D-component in vertical PID (via RNGFND)
+	// @Units: m/s/s
+	// @Range: 0 1
+	// @User: Advanced
+	AP_GROUPINFO("VER_PID_D", 9, AC_Avoid, _ver_pid_d, AC_AVOID_VER_PID_D_DEFAULT),
+
+	// @Param: VER_PID_H
+	// @DisplayName: Target altitude in vertical PID
+	// @Description: Target altitude in vertical PID (via RNGFND)
+	// @Units: m
+	// @Range: 0 3
+	// @User: Advanced
+	AP_GROUPINFO("VER_PID_H", 10, AC_Avoid, _ver_pid_h, AC_AVOID_VER_PID_H_DEFAULT),
+
+	// @Param: VER_CHAN
+	// @DisplayName: Channel to enable altitude correcting
+	// @Description: Channel to enable altitude correcting (via RNGFND)
+	// @Range: 1 16
+	// @User: Advanced
+	AP_GROUPINFO("VER_CHAN", 11, AC_Avoid, _ver_chan, AC_AVOID_VER_CHAN_DEFAULT),
+
     AP_GROUPEND
 };
 
@@ -206,6 +253,11 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     }
 }
 
+void AC_Avoid::print_log() {
+	gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.2f %4.2f %2.4f %2.4f %2.2f %d",
+			(double)_hor_pid_p, (double)_hor_pid_d, (double)_ver_pid_p, (double)_ver_pid_d, (double)_ver_pid_h, (int)_ver_chan);
+}
+
 #define ALPHA 0 //0.995
 
 // adjust roll-pitch to push vehicle away from objects
@@ -236,13 +288,14 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
     float pitch_dist_der = 0.0f;
 
     get_proximity_distance_der(pitch_dist_der, roll_dist_der);
+
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "%4.4f  %4.4f", (double)pitch_dist_der, (double)roll_dist_der);
 
     // add maximum positive and negative percentages together for roll and pitch, convert to centi-degrees
 //    Vector2f rp_out((roll_positive + roll_negative) * 4500.0f, (pitch_positive + pitch_negative) * 4500.0f);
 
-    float rp_out_roll = (roll_positive + roll_negative) * 5000.0f;
-    float rp_out_pitch = (pitch_positive + pitch_negative) * 5000.0f;
+    float rp_out_roll = (roll_positive + roll_negative) * _hor_pid_p;
+    float rp_out_pitch = (pitch_positive + pitch_negative) * _hor_pid_p;
 //    uint32_t time = AP_HAL::millis();
 
 //    static float rp_out_roll_old = rp_out_roll;
@@ -263,8 +316,8 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
 
 //	Vector3f gyro((AP::ahrs()).get_gyro());
 
-	float rp_out_x = rp_out_roll - roll_dist_der * 500.0f;
-	float rp_out_y = rp_out_pitch - pitch_dist_der * 500.0f;
+	float rp_out_x = rp_out_roll - roll_dist_der * _hor_pid_d;
+	float rp_out_y = rp_out_pitch - pitch_dist_der * _hor_pid_d;
 //    if (rp_out_x * rp_out_roll <= 0.0f) {
 //    	rp_out_x = 0;
 //    }
@@ -334,7 +387,7 @@ void AC_Avoid::adjust_roll_pitch(float &roll, float &pitch, float veh_angle_max)
 #define THROTTLE_PID_IP_NEG 0.00005f
 #define THROTTLE_PID_ID 0.0000f   //0.0001f
 
-#define THROTTLE_PID_DP 0.000003f   //0.0002f
+#define THROTTLE_PID_DP 0.0002f   //0.0002f
 
 void AC_Avoid::adjust_throttle(float &throttle_scaled)
 {
@@ -353,14 +406,14 @@ void AC_Avoid::adjust_throttle(float &throttle_scaled)
 
     float result_throttle = 0.0f;
 
-	if (rc().get_radio_in(5) > 1500) {
+	if (rc().get_radio_in(_ver_chan) > 1500) {
 		if (!is_alt_hold) {
 			alt_hold_throttle = throttle_scaled;
 		}
 		is_alt_hold = true;
 		if (_proximity.get_downward_distance(down_dist)
 				&& _proximity.get_downward_dist_der(down_dist_der)) {
-			float error = 0.7f - down_dist;
+			float error = _ver_pid_h - down_dist;
 //			float pid_ip;
 //			if (error > 0.0f) {
 //				pid_ip = error * THROTTLE_PID_IP_POS;
@@ -377,8 +430,8 @@ void AC_Avoid::adjust_throttle(float &throttle_scaled)
 //			}
 //	    	alt_hold_throttle = alt_hold_throttle + pid_ip - pid_id;
 
-			float target_pid_dp = error * 0.1f;                         // when error = 0.1 m = 10 cm, target_vel = error * 0.1 = 1 cm/s
-			float pid_dp = (target_pid_dp - down_dist_der) * THROTTLE_PID_DP;
+			float target_pid_dp = error * _ver_pid_p;                         // when error = 0.1 m = 10 cm, target_vel = error * 0.1 = 1 cm/s
+			float pid_dp = (target_pid_dp - down_dist_der) * _hor_pid_d;
 			alt_hold_throttle = alt_hold_throttle + pid_dp;
 	    }
 	    alt_hold_throttle = MAX(alt_hold_throttle, 0.0f);
