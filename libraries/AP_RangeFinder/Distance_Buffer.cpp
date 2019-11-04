@@ -60,14 +60,14 @@ void Distance_Buffer::add_value(uint16_t val, uint32_t sensor_last_reading_ms) {
 }
 
 void Distance_Buffer::send_data_to_gcs() const {
-	char str[15 + DISTANCE_BUFFER_LENGTH * 4];
-	char loc[5];
-	strcpy(str, "dist_buf: ");
-	for (uint8_t i = 0; i < DISTANCE_BUFFER_LENGTH; i++) {
-		sprintf(loc, "%03d ", sorted_buf[i]);
-		strcat(str, loc);
-	}
-	gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+//	char str[15 + DISTANCE_BUFFER_LENGTH * 4];
+//	char loc[5];
+//	strcpy(str, "dist_buf: ");
+//	for (uint8_t i = 0; i < DISTANCE_BUFFER_LENGTH; i++) {
+//		sprintf(loc, "%03d ", sorted_buf[i]);
+//		strcat(str, loc);
+//	}
+//	gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 }
 
 void Distance_Buffer::add_sensor_data(uint32_t time) {

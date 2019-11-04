@@ -45,9 +45,9 @@ void AP_Proximity_RangeFinder::update(void)
 
     uint32_t now = AP_HAL::millis();
 
-    char str[60];     //for 6 instanses
-    char loc[10];
-    strcpy(str, "prox: ");
+//    char str[60];     //for 6 instanses
+//    char loc[10];
+//    strcpy(str, "prox: ");
 
 
     // look through all rangefinders
@@ -77,7 +77,7 @@ void AP_Proximity_RangeFinder::update(void)
 
             _dist_derivative[sector] = sensor->get_dist_derivative_cmms() * 10.0f;
 
-           	sprintf(loc, "%02.4f ", _dist_derivative[sector]);
+//           	sprintf(loc, "%02.4f ", _dist_derivative[sector]);
 
             _distance_valid[sector] = (_distance[sector] >= _distance_min) && (_distance[sector] <= _distance_max);
             _last_update_ms = now;
@@ -99,14 +99,14 @@ void AP_Proximity_RangeFinder::update(void)
            	_distance_downward = distance;
            	_distance_downward_der = sensor->get_dist_derivative_cmms() * 10.0f;
 
-           	sprintf(loc, "%02.4f ", _distance_downward_der);
+//           	sprintf(loc, "%02.4f ", _distance_downward_der);
 
             if ((_distance_downward < distance_min_m) || (_distance_downward > distance_max_m)) {
                 _distance_downward = -1.0; // mark an valid reading
             }
             _last_downward_update_ms = now;
         }
-       	strcat(str, loc);
+//       	strcat(str, loc);
     }
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 

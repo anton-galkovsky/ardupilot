@@ -214,30 +214,30 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     }
 
 
-    char str[50];
-    char loc[10];
-    strcpy(str, "prox_alt_diff: ");
+//    char str[50];
+//    char loc[10];
+//    strcpy(str, "prox_alt_diff: ");
 
-    sprintf(loc, "%d %f ", limit_alt ? 1 : 0, (double)alt_diff);
-    strcat(str, loc);
+//    sprintf(loc, "%d %f ", limit_alt ? 1 : 0, (double)alt_diff);
+//    strcat(str, loc);
 
     // get distance from proximity sensor
     float proximity_alt_diff;
     if (_proximity.get_upward_distance(proximity_alt_diff)) {
 
-        sprintf(loc, "%f ", (double)proximity_alt_diff);
-        strcat(str, loc);
+//        sprintf(loc, "%f ", (double)proximity_alt_diff);
+//        strcat(str, loc);
 
         proximity_alt_diff -= _margin;
         if (!limit_alt || proximity_alt_diff < alt_diff) {
             alt_diff = proximity_alt_diff;
             limit_alt = true;
 
-            sprintf(loc, "%1.3f ", (double)proximity_alt_diff);
-            strcat(str, loc);
+//            sprintf(loc, "%1.3f ", (double)proximity_alt_diff);
+//            strcat(str, loc);
         }
     }
-    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+//    gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 
     // limit climb rate
     if (limit_alt) {
