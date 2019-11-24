@@ -427,7 +427,6 @@ void AC_Avoid::adjust_throttle(float &throttle_scaled)
 //				pid_ip = error * THROTTLE_PID_IP_NEG;
 //			}
 //		    float pid_id = down_dist_der * THROTTLE_PID_ID;
-
 //	    	if (pid_ip < -THROTTLE_PID_I) {
 //	    		pid_ip = -THROTTLE_PID_I;
 //	    	}
@@ -767,8 +766,6 @@ float AC_Avoid::distance_to_lean_pct(float dist_m)
     if (dist_m < 0.0f || dist_m >= _dist_max || _dist_max <= 0.0f) {
         return 0.0f;
     }
-
-//    gcs().send_text(MAV_SEVERITY_CRITICAL, "dist_max:%f, dist_m:%f", (double)_dist_max, (double)dist_m);
 
     // inverted but linear response
 //    return 1.0f - (dist_m / _dist_max);

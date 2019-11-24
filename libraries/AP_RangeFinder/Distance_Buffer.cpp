@@ -55,8 +55,13 @@ void Distance_Buffer::add_value(uint16_t val, uint32_t sensor_last_reading_ms) {
 	penult_value_cm = last_value_cm;
 	last_value_cm = sorted_buf[DISTANCE_BUFFER_LENGTH / 2];
 
-	value_derivative_cmms = 1.0f * (last_value_cm - penult_value_cm)
-			/ (last_measure_time_ms - penult_measure_time_ms);
+    int max_dist_1 = sensor->max_distance_cm() - 1;
+    if (last_value_cm >= max_dist_1 || penult_value_cm >= max_dist_1) {
+        value_derivative_cmms = 0.0f;
+    } else {
+        value_derivative_cmms = 1.0f * (last_value_cm - penult_value_cm)
+                / (last_measure_time_ms - penult_measure_time_ms);
+    }
 }
 
 void Distance_Buffer::send_data_to_gcs() const {

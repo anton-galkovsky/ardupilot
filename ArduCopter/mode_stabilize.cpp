@@ -53,7 +53,7 @@ void Copter::ModeStabilize::run()
 #if AC_AVOID_ENABLED == ENABLED
 	// apply avoidance
 	copter.avoid.adjust_roll_pitch(target_roll, target_pitch, copter.aparm.angle_max);
-	copter.avoid.adjust_throttle(pilot_throttle_scaled);
+//	copter.avoid.adjust_throttle(pilot_throttle_scaled);
 //    gcs().send_text(MAV_SEVERITY_CRITICAL, "r:%06.1f,p:%06.1f,t:%06.4f", (double)target_roll, (double)target_pitch, (double)pilot_throttle_scaled);
 #endif
 

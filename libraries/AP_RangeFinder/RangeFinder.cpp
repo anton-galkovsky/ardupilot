@@ -362,91 +362,151 @@ void RangeFinder::update(void)
         }
     }
 
-    float downward_dist = -1;
+
 	const AP_AHRS &ahrs = AP::ahrs();
+    float p = ahrs.pitch;
+    float r = ahrs.roll;
+    if (cosf(p) < 0.0001f || cosf(r) < 0.0001f)
+        return;
+    float centered_dist[RANGEFINDER_MAX_INSTANCES];
+    float centered_dist_down[RANGEFINDER_MAX_INSTANCES];
+    float downward_dist = -1.0f;
+
+
+    for (uint8_t i = 0; i < num_instances; i++) {
+        if (drivers[i] != nullptr && !drivers[i]->has_data()) {
+            centered_dist[i] = -2.0f;
+            centered_dist_down[i] = -2.0f;
+        }
+    }
+
 	for (uint8_t i = 0; i < num_instances; i++) {
 		if (drivers[i] != nullptr && drivers[i]->has_data()) {
 			uint8_t sector = (uint8_t) drivers[i]->orientation();
-			if (sector == ROTATION_NONE) {
-				state[i].distance_cm += params[i].pos_offset.get().x * 100.0f;
-			} else if (sector == ROTATION_YAW_180) {
-				state[i].distance_cm -= params[i].pos_offset.get().x * 100.0f;
-			} else if (sector == ROTATION_YAW_90) {
-				state[i].distance_cm += params[i].pos_offset.get().y * 100.0f;
-			} else if (sector == ROTATION_YAW_270) {
-				state[i].distance_cm -= params[i].pos_offset.get().y * 100.0f;
-			} else if (sector == ROTATION_PITCH_90) {
-				state[i].distance_cm -= params[i].pos_offset.get().z * 100.0f;
-			} else if (sector == ROTATION_PITCH_270) {
-				state[i].distance_cm += params[i].pos_offset.get().z * 100.0f;
-				downward_dist = state[i].distance_cm * 1
-						/ sqrtf(tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
+			AP_Vector3f &s = params[i].pos_offset;
+			float s_x = s.get().x * 100.0f;
+            float s_y = s.get().y * 100.0f;
+            float s_z = s.get().z * 100.0f;
+
+			if (sector == ROTATION_NONE || sector == ROTATION_YAW_180) {
+				int signum = sector == ROTATION_NONE ? 1 : -1;
+				float t = (s_x * sinf(r) * sinf(p) + s_y * cosf(p) + s_z * cosf(r) * sinf(p)) / cosf(p);
+				centered_dist[i] = state[i].distance_cm + t * signum;
+
+				if (fabs(sinf(p)) < 0.0001f) {
+				    t = 0.0f;
+				} else {
+				    t = (-s_x * sinf(r) * cosf(p) + s_y * sinf(p) + s_z * cosf(r) * cosf(p)) / sinf(p);
+				}
+				centered_dist_down[i] = (state[i].distance_cm + t * signum) * (float)fabs(sinf(p));
+
+//				if (sector == ROTATION_NONE) {
+//				    gcs().send_text(MAV_SEVERITY_CRITICAL, "%05.2f  %05.2f  %05.2f",
+//				                                (double)((-s_x * sinf(r) * cosf(p))  / sinf(p)),
+//                                                (double)((s_y * sinf(p)) / sinf(p)),
+//                                                (double)((s_z * cosf(r) * cosf(p))  / sinf(p)));
+//				}
+			} else if (sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) {
+				int signum = sector == ROTATION_YAW_90 ? 1 : -1;
+				float t = (s_x * cosf(r) + s_z * sinf(r)) / cosf(r);
+				centered_dist[i] = state[i].distance_cm + t * signum;
+
+                if (fabs(sinf(r)) < 0.0001f) {
+                    t = 0.0f;
+                } else {
+                    t = (-s_x * sinf(r) * cosf(p) + s_y * sinf(p) + s_z * cosf(r) * cosf(p)) / (-sinf(r) * cosf(p));
+                }
+				centered_dist_down[i] = (state[i].distance_cm + t * signum) * (float)fabs(sinf(r)) * cosf(p);
+			} else if (sector == ROTATION_PITCH_90 || sector == ROTATION_PITCH_270) {
+				int signum = sector == ROTATION_PITCH_270 ? 1 : -1;
+				float t = (s_x * sinf(r) * cosf(p) - s_y * sinf(p) - s_z * cosf(r) * cosf(p)) / (cosf(r) * cosf(p));
+				centered_dist[i] = state[i].distance_cm + t * signum;
+
+				if (sector == ROTATION_PITCH_270) {
+					downward_dist = centered_dist[i] * (cosf(r) * cosf(p));
+//                    gcs().send_text(MAV_SEVERITY_CRITICAL, "%05.2f  %05.2f  %05.2f   %05.2f  %05.2f",
+//                            (double)state[i].distance_cm, (double)(t * signum),
+//                            (double)(state[i].distance_cm + t * signum), (double)centered_dist[i], (double)downward_dist);
+				}
 			}
 		}
 	}
+
+
+//	{
+//        char str[65];     //log for 6 instanses
+//        char loc[6];
+//        strcpy(str, "cdd: ");
+//
+//        for (int i = 0; i < num_instances; i++) {
+//            uint8_t sector = (uint8_t) drivers[i]->orientation();
+//            snprintf(loc, 6, "%d ", (((sector == ROTATION_NONE && p < 0.0f)
+//                    || (sector == ROTATION_YAW_180 && p > 0.0f)
+//                    || (sector == ROTATION_YAW_90 && r > 0.0f)
+//                    || (sector == ROTATION_YAW_270 && r < 0.0f)) &&
+//                    (float) fabs(centered_dist_down[i] - downward_dist) < 4.0f) ? 1 : 0);
+//            strcat(str, loc);
+//        }
+//        snprintf(loc, 6, "%03d ", (int) downward_dist);
+//        strcat(str, loc);
+//        gcs().send_text(MAV_SEVERITY_CRITICAL, str);
+//
+//    }
 
 //	bool pitch_points_floor = false;
 //	bool roll_points_floor = false;
-	if (downward_dist >= 0.0f) {      //рассчитывали его
+	if (downward_dist >= 0.0f) {            // was processed
 		for (uint8_t i = 0; i < num_instances; i++) {
 			if (drivers[i] != nullptr && drivers[i]->has_data()) {
 				uint8_t sector = (uint8_t) drivers[i]->orientation();
-				if ((sector == ROTATION_NONE && ahrs.pitch < 0.0f)
-						|| (sector == ROTATION_YAW_180 && ahrs.pitch > 0.0f)) {
-					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.pitch)) - downward_dist) < 4.8f) {
-//						pitch_points_floor = true;
-//						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f %3.1f %010d",
-//								(double)state[i].distance_cm * fabs(sinf(ahrs.pitch)), (double)downward_dist, AP_HAL::millis());
-						state[i].distance_cm = 0; // = 0
-					}
-				} else if ((sector == ROTATION_YAW_90 && ahrs.roll > 0.0f)
-						|| (sector == ROTATION_YAW_270 && ahrs.roll < 0.0f)) {
-					if ((float)fabs(state[i].distance_cm * (float)fabs(sinf(ahrs.roll)) - downward_dist) < 4.8f) {
-//						roll_points_floor = true;
-						state[i].distance_cm = 0; // = 0
-					}
+                if ((sector == ROTATION_NONE && p < 0.0f)
+                        || (sector == ROTATION_YAW_180 && p > 0.0f)
+                        || (sector == ROTATION_YAW_90 && r > 0.0f)
+                        || (sector == ROTATION_YAW_270 && r < 0.0f)) {
+                    if ((float) fabs(centered_dist_down[i] - downward_dist) < 4.0f) {
+                        centered_dist[i] = -3;
+                    }
 				}
+
+////				if (sector == ROTATION_NONE) {
+////				    gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f  %3.1f %3.1f %010d",
+////				            (double)(centered_dist[i] * (float)fabs(sinf(p))) - (double)downward_dist,
+////				         (double)(centered_dist[i] * (float)fabs(sinf(p))), (double)downward_dist, AP_HAL::millis());
+////			    }
+//				if ((sector == ROTATION_NONE && p < 0.0f) || (sector == ROTATION_YAW_180 && p > 0.0f)) {
+//					if ((float)fabs(centered_dist[i] * (float)fabs(sinf(p)) - downward_dist) < 4.0f) {
+//						pitch_points_floor = true;
+////						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f %010d",
+////						        (double)((float)fabs(centered_dist[i] * (float)fabs(sinf(p)) - downward_dist)), AP_HAL::millis());
+////						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f %3.1f %010d",
+////								(double)(centered_dist[i] * (float)fabs(sinf(p))), (double)downward_dist, AP_HAL::millis());
+//					}
+//				} else if ((sector == ROTATION_YAW_90 && r > 0.0f) || (sector == ROTATION_YAW_270 && r < 0.0f)) {
+//					if ((float)fabs(centered_dist[i] * (float)fabs(sinf(r)) * cosf(p) - downward_dist) < 4.8f) {
+//						roll_points_floor = true;
+////						gcs().send_text(MAV_SEVERITY_CRITICAL, "dp: %3.1f %3.1f %010d",
+////								(double)((float)centered_dist[i] * fabs(sinf(r)) * cosf(p)), (double)downward_dist, AP_HAL::millis());
+//					}
+//				}
 			}
 		}
 	}
 
 	for (uint8_t i = 0; i < num_instances; i++) {
-		if (drivers[i] != nullptr && drivers[i]->has_data()) {
+        if (drivers[i] != nullptr && centered_dist[i] < 0.0f) {
+            state[i].distance_cm = params[i].max_distance_cm - 1;
+        } else if (drivers[i] != nullptr && drivers[i]->has_data()) {
 			uint8_t sector = (uint8_t) drivers[i]->orientation();
-//			if (((sector == ROTATION_NONE || sector == ROTATION_YAW_180) && pitch_points_floor)
-//					|| ((sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) && roll_points_floor)) {
-			if (state[i].distance_cm == 0) {
-				state[i].distance_cm = params[i].max_distance_cm - 1; // params[i].max_distance_cm - 1;
-			} else {
-				float offset, pos = 0.0f, coef = 1.0f;
-				offset = params[i].offset * 100.0f;
-				if (sector == ROTATION_NONE) {
-					pos = params[i].pos_offset.get().x * 100.0f;
-					coef = cosf(ahrs.pitch);
-				} else if (sector == ROTATION_YAW_180) {
-					pos = -params[i].pos_offset.get().x * 100.0f;
-					coef = cosf(ahrs.pitch);
-				} else if (sector == ROTATION_YAW_90) {
-					pos = params[i].pos_offset.get().y * 100.0f;
-					coef = cosf(ahrs.roll);
-				} else if (sector == ROTATION_YAW_270) {
-					pos = -params[i].pos_offset.get().y * 100.0f;
-					coef = cosf(ahrs.roll);
-				} else if (sector == ROTATION_PITCH_90) {
-					pos = -params[i].pos_offset.get().z * 100.0f;
-					coef = 1 / sqrtf(
-							tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
-				} else if (sector == ROTATION_PITCH_270) {
-					pos = params[i].pos_offset.get().z * 100.0f;
-					coef = 1 / sqrtf(
-							tanf(ahrs.roll) * tanf(ahrs.roll) + tanf(ahrs.pitch) * tanf(ahrs.pitch) + 1);
-				}
-				state[i].distance_cm = (state[i].distance_cm - (pos + offset)) * coef;
-				state[i].distance_cm = MAX(state[i].distance_cm, params[i].min_distance_cm + 1);            // trim
-			}
-		}
-		if (drivers[i] != nullptr && !drivers[i]->has_data()) {            // has_data() == false
-			state[i].distance_cm = params[i].max_distance_cm - 1;
+            float offseted_dist = centered_dist[i] - params[i].offset * 100.0f;
+            if (sector == ROTATION_NONE || sector == ROTATION_YAW_180) {
+                state[i].distance_cm = (int)(offseted_dist * cosf(p));
+            } else if (sector == ROTATION_YAW_90 || sector == ROTATION_YAW_270) {
+                state[i].distance_cm = (int)(offseted_dist * cosf(r));
+            } else if (sector == ROTATION_PITCH_90 || sector == ROTATION_PITCH_270) {
+                state[i].distance_cm = (int)(offseted_dist * cosf(r) * cosf(p));
+            }
+            state[i].distance_cm = MAX(state[i].distance_cm, params[i].min_distance_cm + 1);            // trim
+			state[i].distance_cm = MIN(state[i].distance_cm, params[i].max_distance_cm - 1);            // trim
 		}
 	}
 
@@ -457,16 +517,16 @@ void RangeFinder::update(void)
 		}
 	}
 
+//	{
+//	    gcs().send_text(MAV_SEVERITY_CRITICAL, "%6.2f, %6.2f",
+//	    		(double)ahrs.pitch, (double)ahrs.roll);
+//
+//	}
 
-	{
-	    gcs().send_text(MAV_SEVERITY_CRITICAL, "%6.2f, %6.2f, %6.2f",
-	    		(double)ahrs.yaw, (double)ahrs.pitch, (double)ahrs.roll);
-
-	}
 
 //	{
 //		char str[60];     //log for 6 instanses
-//		char loc[10];
+//		char loc[6];
 //		strcpy(str, "dist: ");
 //
 //		for (int i = 0; i < num_instances; i++) {
@@ -474,8 +534,6 @@ void RangeFinder::update(void)
 ////			snprintf(loc, 5, "%03d ", drivers[i]->distance_cm());
 //			strcat(str, loc);
 //		}
-//		snprintf(loc, 10, "%d", (int)now);
-//		strcat(str, loc);
 //		gcs().send_text(MAV_SEVERITY_CRITICAL, str);
 //
 //	}
